@@ -16,6 +16,7 @@ import com.shatteredpixel.shatteredpixeldungeon.windows.WndMessage;
 import com.shatteredpixel.shatteredpixeldungeon.windows.WndStudyRating;
 import com.shatteredpixel.shatteredpixeldungeon.windows.WndTextInput;
 import com.watabou.noosa.Game;
+import com.watabou.utils.Callback;
 
 /**
  * Gates normal hero attacks behind one serialized Anki review session.
@@ -173,7 +174,22 @@ public final class CombatStudy {
         });
     }
 
+    /**
+     * Study windows must only be constructed on SPD's render thread.
+     * New cards already arrive there through AndroidAnkiStudyService, but a
+     * cached Wrong -> Again retry is reached directly from Hero.act() on the
+     * SHPD Actor Thread. Always marshal here so both paths are safe.
+     */
     private static void showQuestion(final long token) {
+        Game.runOnRenderThread(new Callback() {
+            @Override
+            public void call() {
+                showQuestionOnRenderThread(token);
+            }
+        });
+    }
+
+    private static void showQuestionOnRenderThread(final long token) {
         if (!isCurrent(token) || pendingHero == null || pendingTarget == null || card == null) {
             cancelSession(token);
             return;
@@ -182,7 +198,7 @@ public final class CombatStudy {
         result = null;
         attemptStartedAt = Game.realTime;
         final StudyCard shownCard = card;
-        StudyDiagnostics.mark("combat showQuestion retry=" + currentAttemptIsRetry
+        StudyDiagnostics.mark("combat showQuestion(render) retry=" + currentAttemptIsRetry
                 + " note=" + shownCard.noteId + " token=" + token);
 
         ShatteredPixelDungeon.scene().addToFront(new WndTextInput(
@@ -428,11 +444,16 @@ public final class CombatStudy {
         );
     }
 
-    private static void showMessage(String message) {
+    private static void showMessage(final String message) {
         if (message == null || message.trim().isEmpty()) return;
-        if (ShatteredPixelDungeon.scene() != null) {
-            ShatteredPixelDungeon.scene().addToFront(new WndMessage(message));
-        }
+        Game.runOnRenderThread(new Callback() {
+            @Override
+            public void call() {
+                if (ShatteredPixelDungeon.scene() != null) {
+                    ShatteredPixelDungeon.scene().addToFront(new WndMessage(message));
+                }
+            }
+        });
     }
 
     private static String safe(String value) {
