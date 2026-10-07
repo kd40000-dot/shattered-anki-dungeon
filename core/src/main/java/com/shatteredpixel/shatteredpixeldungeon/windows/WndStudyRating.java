@@ -15,6 +15,8 @@ import com.shatteredpixel.shatteredpixeldungeon.scenes.PixelScene;
 import com.shatteredpixel.shatteredpixeldungeon.ui.ItemSlot;
 import com.shatteredpixel.shatteredpixeldungeon.ui.RenderedTextBlock;
 import com.shatteredpixel.shatteredpixeldungeon.ui.StudyAnswerComparison;
+import com.shatteredpixel.shatteredpixeldungeon.ui.StudyRatingDots;
+import com.shatteredpixel.shatteredpixeldungeon.study.StudyPreviousRating;
 import com.shatteredpixel.shatteredpixeldungeon.ui.StyledButton;
 import com.shatteredpixel.shatteredpixeldungeon.ui.Window;
 import com.watabou.noosa.NinePatch;
@@ -63,6 +65,16 @@ public abstract class WndStudyRating extends Window {
             txtTitle.maxWidth(width - MARGIN * 2);
             txtTitle.setPos((width - txtTitle.width()) / 2f, pos);
             add(txtTitle);
+
+            StudyRatingDots ratingDots = new StudyRatingDots(StudyPreviousRating.lastEase());
+            if (ratingDots.preferredWidth() > 0) {
+                ratingDots.setPos(
+                        width - MARGIN - ratingDots.preferredWidth(),
+                        pos + Math.max(0f, (txtTitle.height() - ratingDots.preferredHeight()) / 2f)
+                );
+                add(ratingDots);
+            }
+
             pos = txtTitle.bottom() + 2 * MARGIN;
         }
 

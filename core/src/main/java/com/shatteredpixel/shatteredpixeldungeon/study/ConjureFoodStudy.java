@@ -223,6 +223,7 @@ public final class ConjureFoodStudy {
             public void onAnswered() {
                 if (!isCurrent(token)) return;
                 submitting = false;
+                StudyPreviousRating.record(ease);
 
                 boolean completedRation = StudyRunState.recordResolvedReview();
                 persistProgressSafely();
