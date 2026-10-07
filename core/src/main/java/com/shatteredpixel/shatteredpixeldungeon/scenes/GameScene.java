@@ -107,6 +107,7 @@ import com.shatteredpixel.shatteredpixeldungeon.ui.ResumeIndicator;
 import com.shatteredpixel.shatteredpixeldungeon.ui.RightClickMenu;
 import com.shatteredpixel.shatteredpixeldungeon.ui.StatusPane;
 import com.shatteredpixel.shatteredpixeldungeon.ui.StyledButton;
+import com.shatteredpixel.shatteredpixeldungeon.ui.StudyIndicator;
 import com.shatteredpixel.shatteredpixeldungeon.ui.Tag;
 import com.shatteredpixel.shatteredpixeldungeon.ui.TargetHealthIndicator;
 import com.shatteredpixel.shatteredpixeldungeon.ui.Toast;
@@ -215,6 +216,7 @@ public class GameScene extends PixelScene {
 	private AttackIndicator attack;
 	private LootIndicator loot;
 	private ActionIndicator action;
+	private StudyIndicator study;
 	private ResumeIndicator resume;
 
 	{
@@ -517,6 +519,10 @@ public class GameScene extends PixelScene {
 		action = new ActionIndicator();
 		action.camera = uiCamera;
 		add( action );
+
+		study = new StudyIndicator();
+		study.camera = uiCamera;
+		add( study );
 
 		loot = new LootIndicator();
 		loot.camera = uiCamera;
@@ -927,6 +933,7 @@ public class GameScene extends PixelScene {
 			tagAttack = attack.active;
 			tagLoot = loot.visible;
 			tagAction = action.visible;
+			tagStudy = study.visible;
 			tagResume = resume.visible;
 
 			layoutTags();
@@ -934,16 +941,19 @@ public class GameScene extends PixelScene {
 		} else if (tagAttack != attack.active ||
 				tagLoot != loot.visible ||
 				tagAction != action.visible ||
+				tagStudy != study.visible ||
 				tagResume != resume.visible) {
 
 			boolean tagAppearing = (attack.active && !tagAttack) ||
 									(loot.visible && !tagLoot) ||
 									(action.visible && !tagAction) ||
+									(study.visible && !tagStudy) ||
 									(resume.visible && !tagResume);
 
 			tagAttack = attack.active;
 			tagLoot = loot.visible;
 			tagAction = action.visible;
+			tagStudy = study.visible;
 			tagResume = resume.visible;
 
 			//if a new tag appears, re-layout tags immediately
@@ -977,6 +987,7 @@ public class GameScene extends PixelScene {
 	private boolean tagAttack    = false;
 	private boolean tagLoot      = false;
 	private boolean tagAction    = false;
+	private boolean tagStudy     = false;
 	private boolean tagResume    = false;
 
 	public static void layoutTags() {
@@ -1039,6 +1050,12 @@ public class GameScene extends PixelScene {
 			scene.action.setRect( tagLeft, pos - Tag.SIZE, tagWidth, Tag.SIZE );
 			scene.action.flip(tagsOnLeft);
 			pos = scene.action.top();
+		}
+
+		if (scene.tagStudy) {
+			scene.study.setRect( tagLeft, pos - Tag.SIZE, tagWidth, Tag.SIZE );
+			scene.study.flip(tagsOnLeft);
+			pos = scene.study.top();
 		}
 
 		if (scene.tagResume) {
