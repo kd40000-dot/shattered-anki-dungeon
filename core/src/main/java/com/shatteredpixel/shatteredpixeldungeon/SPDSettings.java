@@ -225,6 +225,7 @@ public class SPDSettings extends GameSettings {
 	public static final String KEY_INTRO		= "intro";
 	public static final String KEY_STUDY_CONJURE_FOOD = "study_conjure_food";
 	public static final String KEY_STUDY_COMBAT = "study_combat";
+	public static final String KEY_STUDY_CRASH_DIAGNOSTICS = "study_crash_diagnostics";
 
 	public static final String KEY_SUPPORT_NAGGED= "support_nagged";
 	public static final String KEY_VICTORY_NAGGED= "victory_nagged";
@@ -254,6 +255,15 @@ public class SPDSettings extends GameSettings {
 
 	public static boolean studyCombat() {
 		return getBoolean( KEY_STUDY_COMBAT, true );
+	}
+
+	/** Developer diagnostic recorder; disabled for normal play. */
+	public static void studyCrashDiagnostics( boolean value ) {
+		put( KEY_STUDY_CRASH_DIAGNOSTICS, value );
+	}
+
+	public static boolean studyCrashDiagnostics() {
+		return getBoolean( KEY_STUDY_CRASH_DIAGNOSTICS, false );
 	}
 	
 	public static void lastClass( int value ) {
