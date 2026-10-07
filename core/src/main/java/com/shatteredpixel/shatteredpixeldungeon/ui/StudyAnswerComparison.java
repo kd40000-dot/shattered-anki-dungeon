@@ -90,7 +90,7 @@ public class StudyAnswerComparison extends Component {
             );
         }
 
-        relayout();
+        layout();
     }
 
     private void addLabel(List<RenderedTextBlock> row, String text) {
@@ -104,40 +104,48 @@ public class StudyAnswerComparison extends Component {
         add(block);
     }
 
-    private void relayout() {
+    @Override
+    protected void layout() {
         float contentWidth = width - PADDING * 2f;
 
-        float y = PADDING;
-        y = layoutRow(typedRow, y, contentWidth);
-        y += ROW_GAP;
-        y = layoutRow(answerRow, y, contentWidth);
-        y += PADDING;
+        float contentY = y + PADDING;
+        contentY = layoutRow(typedRow, contentY, contentWidth);
+        contentY += ROW_GAP;
+        contentY = layoutRow(answerRow, contentY, contentWidth);
+        contentY += PADDING;
 
-        height = Math.max(MIN_HEIGHT, y);
+        height = Math.max(MIN_HEIGHT, contentY - y);
+
+        frame.x = x;
+        frame.y = y;
         frame.size(width, height);
     }
 
     private float layoutRow(List<RenderedTextBlock> row, float startY, float contentWidth) {
-        float x = PADDING;
-        float y = startY;
+        float cursorX = x + PADDING;
+        float cursorY = startY;
         float lineHeight = 0;
 
         for (RenderedTextBlock block : row) {
             float blockWidth = block.width();
             float blockHeight = block.height();
 
-            if (x > PADDING && x + blockWidth > PADDING + contentWidth) {
-                y += Math.max(lineHeight, CHAR_SIZE) + 1;
-                x = PADDING;
+            if (cursorX > x + PADDING
+                    && cursorX + blockWidth > x + PADDING + contentWidth) {
+                cursorY += Math.max(lineHeight, CHAR_SIZE) + 1;
+                cursorX = x + PADDING;
                 lineHeight = 0;
             }
 
-            block.setPos(x, y + Math.max(0, (CHAR_SIZE - blockHeight) / 2f));
-            x += blockWidth;
+            block.setPos(
+                    cursorX,
+                    cursorY + Math.max(0, (CHAR_SIZE - blockHeight) / 2f)
+            );
+            cursorX += blockWidth;
             lineHeight = Math.max(lineHeight, blockHeight);
         }
 
-        return y + Math.max(lineHeight, CHAR_SIZE);
+        return cursorY + Math.max(lineHeight, CHAR_SIZE);
     }
 
     public String closestAcceptedAnswer(String typed, String fullAnswer) {
