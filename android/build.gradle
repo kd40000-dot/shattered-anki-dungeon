@@ -1,7 +1,28 @@
 apply plugin: 'com.android.application'
 
+def sadSigningStoreFile = System.getenv("SAD_SIGNING_STORE_FILE")
+def sadSigningStorePassword = System.getenv("SAD_SIGNING_STORE_PASSWORD")
+def sadSigningKeyAlias = System.getenv("SAD_SIGNING_KEY_ALIAS")
+def sadSigningKeyPassword = System.getenv("SAD_SIGNING_KEY_PASSWORD")
+def sadStableSigningConfigured =
+        sadSigningStoreFile != null && !sadSigningStoreFile.isBlank() &&
+        sadSigningStorePassword != null && !sadSigningStorePassword.isBlank() &&
+        sadSigningKeyAlias != null && !sadSigningKeyAlias.isBlank() &&
+        sadSigningKeyPassword != null && !sadSigningKeyPassword.isBlank()
+
 android {
     namespace 'com.shatteredpixel.shatteredpixeldungeon.android'
+
+    signingConfigs {
+        if (sadStableSigningConfigured) {
+            sadStable {
+                storeFile file(sadSigningStoreFile)
+                storePassword sadSigningStorePassword
+                keyAlias sadSigningKeyAlias
+                keyPassword sadSigningKeyPassword
+            }
+        }
+    }
     compileSdk appAndroidCompileSDK
     compileOptions.sourceCompatibility = compileOptions.targetCompatibility = appJavaCompatibility
 
@@ -27,12 +48,18 @@ android {
         debug {
             applicationIdSuffix ".indev"
             versionNameSuffix '-INDEV'
+            if (sadStableSigningConfigured) {
+                signingConfig signingConfigs.sadStable
+            }
             dependencies {
                 debugImplementation project(':services:updates:debugUpdates')
                 debugImplementation project(':services:news:debugNews')
             }
         }
         release {
+            if (sadStableSigningConfigured) {
+                signingConfig signingConfigs.sadStable
+            }
 
             //These lines enable R8, which is a code shrinker/optimizer/obfuscator.
             //This makes release APKs smaller and more efficient, but also makes debugging trickier
