@@ -227,7 +227,6 @@ public class Hero extends Char {
 
 	//reference to the enemy the hero is currently in the process of attacking
 	private Char attackTarget;
-	private boolean studyAttackBypass;
 	
 	public boolean resting = false;
 	
@@ -1469,23 +1468,11 @@ public class Hero extends Char {
 
 		if (attackTarget.isAlive() && canAttack(attackTarget) && attackTarget.invisible == 0) {
 
-			if (!studyAttackBypass && CombatStudy.interceptAttack(this, attackTarget)) {
+			if (CombatStudy.interceptAttack(this, attackTarget)) {
 				return false;
 			}
 
-			if (heroClass != HeroClass.DUELIST
-					&& hasTalent(Talent.AGGRESSIVE_BARRIER)
-					&& buff(Talent.AggressiveBarrierCooldown.class) == null
-					&& (HP / (float)HT) <= 0.5f){
-				int shieldAmt = 1 + 2*pointsInTalent(Talent.AGGRESSIVE_BARRIER);
-				Buff.affect(this, Barrier.class).setShield(shieldAmt);
-				sprite.showStatusWithIcon(CharSprite.POSITIVE, Integer.toString(shieldAmt), FloatingText.SHIELDING);
-				Buff.affect(this, Talent.AggressiveBarrierCooldown.class, 50f);
-
-			}
-			//attack target cleared on onAttackComplete
-			sprite.attack( attackTarget.pos );
-
+			beginAttackAnimation();
 			return false;
 
 		} else {
@@ -1508,20 +1495,41 @@ public class Hero extends Char {
 		return attackTarget;
 	}
 
-	/** Resume a normal SPD attack after a combat review is successfully resolved. */
+	/**
+	 * Starts the already-approved SPD attack without recursively re-entering
+	 * actAttack. Re-entering the action dispatcher from an async Anki callback
+	 * left turn state fragile for the following action.
+	 */
 	public void studyAttackApproved(Char target) {
-		if (target == null || !isAlive()) {
+		if (target == null || !isAlive() || !target.isAlive()
+				|| !canAttack(target) || target.invisible != 0 || isCharmedBy(target)) {
 			studyAttackCancelled();
 			return;
 		}
 
-		studyAttackBypass = true;
-		try {
-			curAction = new HeroAction.Attack(target);
-			actAttack((HeroAction.Attack)curAction);
-		} finally {
-			studyAttackBypass = false;
+		attackTarget = target;
+		curAction = new HeroAction.Attack(target);
+		beginAttackAnimation();
+	}
+
+	private void beginAttackAnimation() {
+		if (attackTarget == null) {
+			studyAttackCancelled();
+			return;
 		}
+
+		if (heroClass != HeroClass.DUELIST
+				&& hasTalent(Talent.AGGRESSIVE_BARRIER)
+				&& buff(Talent.AggressiveBarrierCooldown.class) == null
+				&& (HP / (float)HT) <= 0.5f){
+			int shieldAmt = 1 + 2*pointsInTalent(Talent.AGGRESSIVE_BARRIER);
+			Buff.affect(this, Barrier.class).setShield(shieldAmt);
+			sprite.showStatusWithIcon(CharSprite.POSITIVE, Integer.toString(shieldAmt), FloatingText.SHIELDING);
+			Buff.affect(this, Talent.AggressiveBarrierCooldown.class, 50f);
+		}
+
+		// attackTarget is cleared by onAttackComplete.
+		sprite.attack(attackTarget.pos);
 	}
 
 	/** Consume the normal attack turn without dealing damage. */
