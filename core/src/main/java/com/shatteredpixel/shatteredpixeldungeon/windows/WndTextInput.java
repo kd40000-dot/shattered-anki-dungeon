@@ -27,6 +27,7 @@ import com.shatteredpixel.shatteredpixeldungeon.scenes.PixelScene;
 import com.shatteredpixel.shatteredpixeldungeon.ui.Icons;
 import com.shatteredpixel.shatteredpixeldungeon.ui.RedButton;
 import com.shatteredpixel.shatteredpixeldungeon.ui.RenderedTextBlock;
+import com.shatteredpixel.shatteredpixeldungeon.ui.StudyCardPanel;
 import com.shatteredpixel.shatteredpixeldungeon.ui.Window;
 import com.watabou.input.PointerEvent;
 import com.watabou.noosa.Game;
@@ -49,12 +50,18 @@ public class WndTextInput extends Window {
 
 	public WndTextInput(final String title, final String body, final String initialValue, final int maxLength,
 	                           final boolean multiLine, final String posTxt, final String negTxt) {
-		this(title, body, initialValue, maxLength, multiLine, posTxt, negTxt, false);
+		this(title, body, initialValue, maxLength, multiLine, posTxt, negTxt, false, false);
 	}
 
 	public WndTextInput(final String title, final String body, final String initialValue, final int maxLength,
 	                           final boolean multiLine, final String posTxt, final String negTxt,
 	                           final boolean nativeImeProxy) {
+		this(title, body, initialValue, maxLength, multiLine, posTxt, negTxt, nativeImeProxy, false);
+	}
+
+	public WndTextInput(final String title, final String body, final String initialValue, final int maxLength,
+	                           final boolean multiLine, final String posTxt, final String negTxt,
+	                           final boolean nativeImeProxy, final boolean prominentBody) {
 		super();
 
 		final int width;
@@ -77,12 +84,20 @@ public class WndTextInput extends Window {
 		}
 
 		if (body != null) {
-			final RenderedTextBlock txtBody = PixelScene.renderTextBlock(body, 6);
-			txtBody.maxWidth(width);
-			txtBody.setPos(0, pos);
-			add(txtBody);
+			if (prominentBody) {
+				StudyCardPanel cardPanel = new StudyCardPanel(body, 10);
+				float panelHeight = cardPanel.preferredHeight(width);
+				add(cardPanel);
+				cardPanel.setRect(0, pos, width, panelHeight);
+				pos = cardPanel.bottom() + 3 * MARGIN;
+			} else {
+				final RenderedTextBlock txtBody = PixelScene.renderTextBlock(body, 6);
+				txtBody.maxWidth(width);
+				txtBody.setPos(0, pos);
+				add(txtBody);
 
-			pos = txtBody.bottom() + 2 * MARGIN;
+				pos = txtBody.bottom() + 2 * MARGIN;
+			}
 		}
 
 		int textSize = (int)PixelScene.uiCamera.zoom * (multiLine ? 6 : 9);
