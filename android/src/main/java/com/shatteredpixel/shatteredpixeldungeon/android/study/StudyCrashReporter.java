@@ -62,6 +62,14 @@ public final class StudyCrashReporter {
         });
     }
 
+    public static void clearPending(Context context) {
+        context.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
+                .edit()
+                .remove(KEY_REPORT)
+                .apply();
+        shownThisProcess.set(false);
+    }
+
     public static void showPending(Activity activity) {
         if (!shownThisProcess.compareAndSet(false, true)) return;
 
