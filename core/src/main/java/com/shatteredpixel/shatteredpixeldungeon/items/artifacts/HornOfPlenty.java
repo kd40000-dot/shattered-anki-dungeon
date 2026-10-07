@@ -37,6 +37,7 @@ import com.shatteredpixel.shatteredpixeldungeon.items.Item;
 import com.shatteredpixel.shatteredpixeldungeon.items.bags.Bag;
 import com.shatteredpixel.shatteredpixeldungeon.items.food.Blandfruit;
 import com.shatteredpixel.shatteredpixeldungeon.items.food.Food;
+import com.shatteredpixel.shatteredpixeldungeon.items.food.ConjuredRation;
 import com.shatteredpixel.shatteredpixeldungeon.items.food.MeatPie;
 import com.shatteredpixel.shatteredpixeldungeon.items.food.Pasty;
 import com.shatteredpixel.shatteredpixeldungeon.items.food.PhantomMeat;
@@ -325,7 +326,7 @@ public class HornOfPlenty extends Artifact {
 
 		@Override
 		public boolean itemSelectable(Item item) {
-			return item instanceof Food;
+			return item instanceof Food && !(item instanceof ConjuredRation);
 		}
 
 		@Override
