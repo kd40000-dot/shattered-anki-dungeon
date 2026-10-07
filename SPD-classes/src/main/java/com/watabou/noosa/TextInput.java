@@ -59,6 +59,7 @@ public class TextInput extends Component {
 
 	private final boolean nativeImeProxy;
 	private boolean syncingFromNative;
+	private boolean destroyed;
 
 	public TextInput( NinePatch bg, boolean multiline, int size ){
 		this(bg, multiline, size, false);
@@ -293,17 +294,27 @@ public class TextInput extends Component {
 
 	@Override
 	public synchronized void destroy() {
-		super.destroy();
-		if (stage != null) {
-			stage.dispose();
-			skin.dispose();
-			Game.inputHandler.removeInputProcessor(stage);
-			if (nativeImeProxy) {
-				Game.platform.stopNativeTextInputProxy();
-			} else {
-				Game.platform.setOnscreenKeyboardVisible(false, false);
-			}
-			if (!DeviceCompat.isDesktop()) Game.platform.updateSystemUI();
+		if (destroyed) return;
+		destroyed = true;
+
+		if (nativeImeProxy) {
+			Game.platform.stopNativeTextInputProxy();
+		} else {
+			Game.platform.setOnscreenKeyboardVisible(false, false);
 		}
+
+		if (stage != null) {
+			Game.inputHandler.removeInputProcessor(stage);
+			stage.dispose();
+			stage = null;
+		}
+
+		if (skin != null) {
+			skin.dispose();
+			skin = null;
+		}
+
+		if (!DeviceCompat.isDesktop()) Game.platform.updateSystemUI();
+		super.destroy();
 	}
 }
