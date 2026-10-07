@@ -17,6 +17,7 @@ import com.shatteredpixel.shatteredpixeldungeon.messages.Messages;
 import com.shatteredpixel.shatteredpixeldungeon.ui.ItemSlot;
 import com.shatteredpixel.shatteredpixeldungeon.windows.WndMessage;
 import com.shatteredpixel.shatteredpixeldungeon.windows.WndStudyRating;
+import com.shatteredpixel.shatteredpixeldungeon.windows.WndTextInput;
 import com.watabou.noosa.Game;
 
 /**
@@ -128,24 +129,32 @@ public final class CombatStudy {
         result = null;
         attemptStartedAt = Game.realTime;
 
-        Study.service.requestTypedAnswer(
+        ShatteredPixelDungeon.scene().addToFront(new WndTextInput(
                 Messages.get(CombatStudy.class, "title"),
                 card.question,
+                "",
+                512,
+                false,
                 Messages.get(CombatStudy.class, "check"),
                 Messages.get(CombatStudy.class, "cancel"),
-                new StudyService.TextInputCallback() {
-                    @Override
-                    public void onSubmitted(String text) {
-                        if (pendingHero == null || card == null) return;
-                        revealAnswer(text == null ? "" : text);
-                    }
-
-                    @Override
-                    public void onCancelled() {
-                        cancelPendingAttack();
-                    }
+                true
+        ) {
+            @Override
+            public void onSelect(boolean positive, String text) {
+                if (!positive) {
+                    cancelPendingAttack();
+                    return;
                 }
-        );
+                if (pendingHero == null || card == null) return;
+                revealAnswer(text == null ? "" : text);
+            }
+
+            @Override
+            public void onBackPressed() {
+                cancelPendingAttack();
+                hide();
+            }
+        });
     }
 
     private static void revealAnswer(String typed) {
