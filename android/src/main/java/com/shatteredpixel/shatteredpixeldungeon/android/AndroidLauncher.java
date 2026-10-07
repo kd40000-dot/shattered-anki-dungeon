@@ -41,6 +41,8 @@ import com.badlogic.gdx.backends.android.AsynchronousAndroidAudio;
 import com.badlogic.gdx.graphics.g2d.freetype.FreeType;
 import com.badlogic.gdx.utils.GdxNativesLoader;
 import com.shatteredpixel.shatteredpixeldungeon.SPDSettings;
+import com.shatteredpixel.shatteredpixeldungeon.android.study.AndroidAnkiStudyService;
+import com.shatteredpixel.shatteredpixeldungeon.study.Study;
 import com.shatteredpixel.shatteredpixeldungeon.ShatteredPixelDungeon;
 import com.shatteredpixel.shatteredpixeldungeon.services.news.News;
 import com.shatteredpixel.shatteredpixeldungeon.services.news.NewsImpl;
@@ -131,6 +133,9 @@ public class AndroidLauncher extends AndroidApplication {
 		} else {
 			instance = this;
 		}
+
+		//Core gameplay talks only to StudyService; Android supplies AnkiDroid access.
+		Study.service = new AndroidAnkiStudyService(this);
 
 		//Shattered still overrides the back gesture behaviour, but we need to do it in a new way
 		// (API added in Android 13, functionality enforced in Android 16)
