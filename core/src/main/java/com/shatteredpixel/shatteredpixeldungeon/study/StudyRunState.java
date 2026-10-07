@@ -26,18 +26,21 @@ public final class StudyRunState {
     };
 
     private static final String CONJURE_FOOD_ENABLED = "conjure_food_enabled";
+    private static final String COMBAT_ENABLED = "combat_enabled";
     private static final String CONJURED_RATIONS = "conjured_rations";
     private static final String REVIEWS_TOWARD_NEXT = "reviews_toward_next";
 
     private static boolean conjureFoodEnabled;
+    private static boolean combatEnabled;
     private static int conjuredRations;
     private static int reviewsTowardNext;
 
     private StudyRunState() {
     }
 
-    public static void reset(boolean enabled) {
-        conjureFoodEnabled = enabled;
+    public static void reset(boolean conjureEnabled, boolean ankiCombatEnabled) {
+        conjureFoodEnabled = conjureEnabled;
+        combatEnabled = ankiCombatEnabled;
         conjuredRations = 0;
         reviewsTowardNext = 0;
     }
@@ -48,6 +51,14 @@ public final class StudyRunState {
 
     public static void conjureFoodEnabled(boolean enabled) {
         conjureFoodEnabled = enabled;
+    }
+
+    public static boolean combatEnabled() {
+        return combatEnabled;
+    }
+
+    public static void combatEnabled(boolean enabled) {
+        combatEnabled = enabled;
     }
 
     public static int conjuredRations() {
@@ -96,19 +107,28 @@ public final class StudyRunState {
 
     public static void storeInBundle(Bundle bundle) {
         bundle.put(CONJURE_FOOD_ENABLED, conjureFoodEnabled);
+        bundle.put(COMBAT_ENABLED, combatEnabled);
         bundle.put(CONJURED_RATIONS, conjuredRations);
         bundle.put(REVIEWS_TOWARD_NEXT, reviewsTowardNext);
     }
 
-    public static void restoreFromBundle(Bundle bundle, boolean defaultEnabled) {
+    public static void restoreFromBundle(
+            Bundle bundle,
+            boolean defaultConjureEnabled,
+            boolean defaultCombatEnabled
+    ) {
         if (bundle == null || bundle.isNull()) {
-            reset(defaultEnabled);
+            reset(defaultConjureEnabled, defaultCombatEnabled);
             return;
         }
 
         conjureFoodEnabled = bundle.contains(CONJURE_FOOD_ENABLED)
                 ? bundle.getBoolean(CONJURE_FOOD_ENABLED)
-                : defaultEnabled;
+                : defaultConjureEnabled;
+
+        combatEnabled = bundle.contains(COMBAT_ENABLED)
+                ? bundle.getBoolean(COMBAT_ENABLED)
+                : defaultCombatEnabled;
 
         conjuredRations = Math.max(0, bundle.getInt(CONJURED_RATIONS));
         reviewsTowardNext = Math.max(0, bundle.getInt(REVIEWS_TOWARD_NEXT));
