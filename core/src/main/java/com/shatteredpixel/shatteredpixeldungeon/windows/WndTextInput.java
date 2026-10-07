@@ -28,6 +28,8 @@ import com.shatteredpixel.shatteredpixeldungeon.ui.Icons;
 import com.shatteredpixel.shatteredpixeldungeon.ui.ItemSlot;
 import com.shatteredpixel.shatteredpixeldungeon.ui.RedButton;
 import com.shatteredpixel.shatteredpixeldungeon.ui.RenderedTextBlock;
+import com.shatteredpixel.shatteredpixeldungeon.ui.StudyRatingDots;
+import com.shatteredpixel.shatteredpixeldungeon.study.StudyPreviousRating;
 import com.shatteredpixel.shatteredpixeldungeon.ui.Window;
 import com.watabou.input.PointerEvent;
 import com.watabou.noosa.Game;
@@ -80,6 +82,17 @@ public class WndTextInput extends Window {
 			txtTitle.hardlight(Window.TITLE_COLOR);
 			txtTitle.setPos((width - txtTitle.width()) / 2, 2);
 			add(txtTitle);
+
+			if (studyStyle) {
+				StudyRatingDots ratingDots = new StudyRatingDots(StudyPreviousRating.lastEase());
+				if (ratingDots.preferredWidth() > 0) {
+					ratingDots.setPos(
+							width - MARGIN - ratingDots.preferredWidth(),
+							2 + Math.max(0f, (txtTitle.height() - ratingDots.preferredHeight()) / 2f)
+					);
+					add(ratingDots);
+				}
+			}
 
 			pos = txtTitle.bottom() + 4 * MARGIN;
 		}
