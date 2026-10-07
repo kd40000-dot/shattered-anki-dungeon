@@ -276,13 +276,17 @@ public final class AndroidAnkiBridge {
         if (card == null) {
             throw new IllegalArgumentException("card == null");
         }
+        return answer(card.noteId, card.ord, ease, timeTakenMs);
+    }
+
+    public boolean answer(long noteId, int ord, int ease, long timeTakenMs) {
         if (ease < 1 || ease > 4) {
             throw new IllegalArgumentException("ease must be 1..4");
         }
 
         ContentValues values = new ContentValues();
-        values.put("note_id", card.noteId);
-        values.put("ord", card.ord);
+        values.put("note_id", noteId);
+        values.put("ord", ord);
         values.put("answer_ease", ease);
         values.put("time_taken", Math.max(0L, timeTakenMs));
 
