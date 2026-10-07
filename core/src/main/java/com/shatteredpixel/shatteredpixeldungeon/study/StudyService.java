@@ -23,9 +23,8 @@ public interface StudyService {
         void onError(String message);
     }
 
-    interface TextInputCallback {
-        void onSubmitted(String text);
-        void onCancelled();
+    interface AccessCallback {
+        void onAccessResult(boolean granted, String message);
     }
 
     /** True when a supported AnkiDroid provider is installed and discoverable. */
@@ -38,24 +37,13 @@ public interface StudyService {
     boolean hasAccess();
 
     /**
-     * Requests access when needed.
+     * Requests provider access when needed. The callback is invoked only after
+     * Android has produced a final permission result (or immediately when
+     * access is already available/unavailable).
      *
-     * @return true when access is already available; false when an Android
-     * permission request was launched or access cannot currently be requested.
+     * @return true only when access is already available synchronously.
      */
-    boolean requestAccess();
-
-    /**
-     * Opens a platform-native single-line text editor. On Android this uses a
-     * real EditText so IME composition systems such as Vietnamese Telex work.
-     */
-    void requestTypedAnswer(
-            String title,
-            String prompt,
-            String positiveLabel,
-            String negativeLabel,
-            TextInputCallback callback
-    );
+    boolean requestAccess(AccessCallback callback);
 
     /** Loads the next due card without blocking the game/render thread. */
     void loadNextCard(CardCallback callback);
