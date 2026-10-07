@@ -67,7 +67,14 @@ public final class AndroidAnkiStudyService implements StudyService {
             return true;
         }
 
-        bridge.requestPermission(activity, REQUEST_ANKI_DATABASE_PERMISSION);
+        // LibGDX gameplay runs on the GL/render thread. Android permission UI
+        // must be launched on the Activity's UI thread.
+        activity.runOnUiThread(() -> {
+            AndroidAnkiBridge current = connect();
+            if (current != null && !current.hasPermission()) {
+                current.requestPermission(activity, REQUEST_ANKI_DATABASE_PERMISSION);
+            }
+        });
         return false;
     }
 
