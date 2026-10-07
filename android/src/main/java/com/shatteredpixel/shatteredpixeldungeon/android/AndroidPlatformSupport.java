@@ -24,14 +24,23 @@ package com.shatteredpixel.shatteredpixeldungeon.android;
 import android.content.Context;
 import android.content.pm.ActivityInfo;
 import android.graphics.Rect;
+import android.text.Editable;
+import android.text.InputFilter;
+import android.text.TextWatcher;
+import android.view.Gravity;
 import android.net.ConnectivityManager;
 import android.os.Build;
 import android.view.DisplayCutout;
 import android.view.View;
 import android.view.WindowInsets;
 import android.view.WindowManager;
+import android.view.inputmethod.EditorInfo;
+import android.view.inputmethod.InputMethodManager;
+import android.widget.EditText;
+import android.widget.FrameLayout;
 
 import com.badlogic.gdx.Gdx;
+import com.badlogic.gdx.Input;
 import com.badlogic.gdx.graphics.Pixmap;
 import com.badlogic.gdx.graphics.g2d.PixmapPacker;
 import com.badlogic.gdx.graphics.g2d.freetype.FreeTypeFontGenerator;
@@ -46,6 +55,12 @@ import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
 public class AndroidPlatformSupport extends PlatformSupport {
+
+	private EditText nativeTextInputProxy;
+	private TextWatcher nativeTextInputWatcher;
+	private NativeTextInputListener nativeTextInputListener;
+	private boolean nativeTextInputUpdating;
+
 	
 	public void updateDisplaySize(){
 		AndroidLauncher.instance.setRequestedOrientation( SPDSettings.landscape() ?
@@ -193,6 +208,146 @@ public class AndroidPlatformSupport extends PlatformSupport {
 	@Override
 	public boolean supportsVibration() {
 		return true; //always true on Android
+	}
+
+	@Override
+	public boolean supportsNativeTextInputProxy() {
+		return true;
+	}
+
+	@Override
+	public void startNativeTextInputProxy(String initialText, boolean multiline, NativeTextInputListener listener) {
+		AndroidLauncher.instance.runOnUiThread(() -> {
+			stopNativeTextInputProxyOnUiThread();
+
+			nativeTextInputListener = listener;
+			EditText input = new EditText(AndroidLauncher.instance);
+			nativeTextInputProxy = input;
+
+			input.setSingleLine(!multiline);
+			input.setMaxLines(multiline ? Integer.MAX_VALUE : 1);
+			input.setImeOptions(multiline ? EditorInfo.IME_FLAG_NO_ENTER_ACTION : EditorInfo.IME_ACTION_DONE);
+			input.setInputType(android.text.InputType.TYPE_CLASS_TEXT
+					| (multiline ? android.text.InputType.TYPE_TEXT_FLAG_MULTI_LINE : 0));
+			input.setBackground(null);
+			input.setPadding(0, 0, 0, 0);
+			input.setAlpha(0.01f);
+			input.setCursorVisible(false);
+			input.setText(initialText == null ? "" : initialText);
+			input.setSelection(input.getText().length());
+
+			nativeTextInputWatcher = new TextWatcher() {
+				@Override public void beforeTextChanged(CharSequence s, int start, int count, int after) {}
+				@Override public void onTextChanged(CharSequence s, int start, int before, int count) {}
+
+				@Override
+				public void afterTextChanged(Editable s) {
+					if (nativeTextInputUpdating || nativeTextInputListener == null) return;
+					String value = s == null ? "" : s.toString();
+					Gdx.app.postRunnable(() -> {
+						if (nativeTextInputListener != null) {
+							nativeTextInputListener.onTextChanged(value);
+						}
+					});
+				}
+			};
+			input.addTextChangedListener(nativeTextInputWatcher);
+
+			if (!multiline) {
+				input.setOnEditorActionListener((v, actionId, event) -> {
+					if (actionId == EditorInfo.IME_ACTION_DONE) {
+						Gdx.app.postRunnable(() -> {
+							if (nativeTextInputListener != null) {
+								nativeTextInputListener.onEnterPressed();
+							}
+						});
+						return true;
+					}
+					return false;
+				});
+			}
+
+			FrameLayout.LayoutParams params = new FrameLayout.LayoutParams(1, 1);
+			params.gravity = Gravity.TOP | Gravity.START;
+			AndroidLauncher.instance.addContentView(input, params);
+
+			input.requestFocus();
+			InputMethodManager imm = (InputMethodManager) AndroidLauncher.instance.getSystemService(Context.INPUT_METHOD_SERVICE);
+			if (imm != null) {
+				input.post(() -> imm.showSoftInput(input, InputMethodManager.SHOW_IMPLICIT));
+			}
+		});
+	}
+
+	@Override
+	public void updateNativeTextInputProxy(String text) {
+		AndroidLauncher.instance.runOnUiThread(() -> {
+			if (nativeTextInputProxy == null) return;
+			String value = text == null ? "" : text;
+			if (value.contentEquals(nativeTextInputProxy.getText())) return;
+
+			nativeTextInputUpdating = true;
+			nativeTextInputProxy.setText(value);
+			nativeTextInputProxy.setSelection(nativeTextInputProxy.getText().length());
+			nativeTextInputUpdating = false;
+		});
+	}
+
+	@Override
+	public void setNativeTextInputProxyMaxLength(int maxLength) {
+		AndroidLauncher.instance.runOnUiThread(() -> {
+			if (nativeTextInputProxy == null) return;
+			if (maxLength > 0) {
+				nativeTextInputProxy.setFilters(new InputFilter[]{new InputFilter.LengthFilter(maxLength)});
+			} else {
+				nativeTextInputProxy.setFilters(new InputFilter[0]);
+			}
+		});
+	}
+
+	@Override
+	public void setNativeTextInputProxyVisible(boolean visible, boolean multiline) {
+		AndroidLauncher.instance.runOnUiThread(() -> {
+			if (nativeTextInputProxy == null) return;
+
+			InputMethodManager imm = (InputMethodManager) AndroidLauncher.instance.getSystemService(Context.INPUT_METHOD_SERVICE);
+			if (visible) {
+				nativeTextInputProxy.requestFocus();
+				if (imm != null) imm.showSoftInput(nativeTextInputProxy, InputMethodManager.SHOW_IMPLICIT);
+			} else {
+				if (imm != null) imm.hideSoftInputFromWindow(nativeTextInputProxy.getWindowToken(), 0);
+			}
+		});
+	}
+
+	@Override
+	public void stopNativeTextInputProxy() {
+		AndroidLauncher.instance.runOnUiThread(this::stopNativeTextInputProxyOnUiThread);
+	}
+
+	private void stopNativeTextInputProxyOnUiThread() {
+		if (nativeTextInputProxy == null) {
+			nativeTextInputListener = null;
+			return;
+		}
+
+		InputMethodManager imm = (InputMethodManager) AndroidLauncher.instance.getSystemService(Context.INPUT_METHOD_SERVICE);
+		if (imm != null) {
+			imm.hideSoftInputFromWindow(nativeTextInputProxy.getWindowToken(), 0);
+		}
+
+		if (nativeTextInputWatcher != null) {
+			nativeTextInputProxy.removeTextChangedListener(nativeTextInputWatcher);
+		}
+
+		if (nativeTextInputProxy.getParent() instanceof android.view.ViewGroup) {
+			((android.view.ViewGroup) nativeTextInputProxy.getParent()).removeView(nativeTextInputProxy);
+		}
+
+		nativeTextInputProxy = null;
+		nativeTextInputWatcher = null;
+		nativeTextInputListener = null;
+		nativeTextInputUpdating = false;
 	}
 
 	/* FONT SUPPORT */
