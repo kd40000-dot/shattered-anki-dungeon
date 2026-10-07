@@ -153,6 +153,7 @@ public final class AndroidAnkiBridge {
      */
     public static BackendInfo discoverBackend(Context context) {
         PackageManager pm = context.getPackageManager();
+        BackendInfo preferredInstalled = null;
 
         for (Candidate candidate : CANDIDATES) {
             ProviderInfo info = pm.resolveContentProvider(candidate.authority, PackageManager.GET_META_DATA);
@@ -171,16 +172,30 @@ public final class AndroidAnkiBridge {
                 spec = meta.getInt(PROVIDER_SPEC_META, 0);
             }
 
-            return new BackendInfo(
+            BackendInfo backend = new BackendInfo(
                     candidate.kind,
                     candidate.packageName,
                     candidate.authority,
                     candidate.permission,
                     spec
             );
+
+            // If the user already granted one provider, use it immediately. This
+            // lets stock AnkiDroid remain usable even when Retry is also installed.
+            boolean permissionGranted = Build.VERSION.SDK_INT < Build.VERSION_CODES.M
+                    || context.checkSelfPermission(candidate.permission) == PackageManager.PERMISSION_GRANTED;
+            if (permissionGranted) {
+                return backend;
+            }
+
+            // Candidate order is intentional: Retry is preferred when neither
+            // installed backend has been authorized yet.
+            if (preferredInstalled == null) {
+                preferredInstalled = backend;
+            }
         }
 
-        return null;
+        return preferredInstalled;
     }
 
     public static AndroidAnkiBridge connect(Context context) {
