@@ -37,6 +37,7 @@ public final class AndroidAnkiStudyService implements StudyService {
     private final Object permissionLock = new Object();
     private final List<AccessCallback> pendingAccessCallbacks = new ArrayList<>();
     private boolean permissionRequestInFlight;
+    private volatile boolean destroyed;
 
     public AndroidAnkiStudyService(Activity activity) {
         this.activity = activity;
@@ -81,6 +82,11 @@ public final class AndroidAnkiStudyService implements StudyService {
 
     @Override
     public boolean requestAccess(AccessCallback callback) {
+        if (destroyed) {
+            postAccess(callback, false, "The game activity is shutting down.");
+            return false;
+        }
+
         AndroidAnkiBridge bridge = connect();
         if (bridge == null) {
             postAccess(callback, false, "No compatible AnkiDroid installation was found.");
@@ -160,6 +166,7 @@ public final class AndroidAnkiStudyService implements StudyService {
     }
 
     public void onHostDestroy() {
+        destroyed = true;
         finishAccessRequest(false, "The game closed before AnkiDroid access finished.");
         worker.shutdownNow();
     }
@@ -198,9 +205,15 @@ public final class AndroidAnkiStudyService implements StudyService {
             return;
         }
 
-        worker.execute(() -> {
-            try {
-                AndroidAnkiBridge.ReviewCard card = bridge.loadNextCard();
+        if (destroyed) {
+            post(() -> callback.onError("The game activity is shutting down."));
+            return;
+        }
+
+        try {
+            worker.execute(() -> {
+                try {
+                    AndroidAnkiBridge.ReviewCard card = bridge.loadNextCard();
                 if (card == null) {
                     post(callback::onNoCardsDue);
                     return;
@@ -217,10 +230,13 @@ public final class AndroidAnkiStudyService implements StudyService {
                         card.mediaFiles
                 );
                 post(() -> callback.onCardLoaded(studyCard));
-            } catch (Exception e) {
-                post(() -> callback.onError(errorMessage(e)));
-            }
-        });
+                } catch (Exception e) {
+                    post(() -> callback.onError(errorMessage(e)));
+                }
+            });
+        } catch (RuntimeException e) {
+            post(() -> callback.onError(errorMessage(e)));
+        }
     }
 
     @Override
@@ -240,17 +256,26 @@ public final class AndroidAnkiStudyService implements StudyService {
             return;
         }
 
-        worker.execute(() -> {
-            try {
-                if (bridge.answer(card.noteId, card.ord, ease, timeTakenMs)) {
+        if (destroyed) {
+            post(() -> callback.onError("The game activity is shutting down."));
+            return;
+        }
+
+        try {
+            worker.execute(() -> {
+                try {
+                    if (bridge.answer(card.noteId, card.ord, ease, timeTakenMs)) {
                     post(callback::onAnswered);
                 } else {
                     post(() -> callback.onError("AnkiDroid did not accept the review result."));
                 }
-            } catch (Exception e) {
-                post(() -> callback.onError(errorMessage(e)));
-            }
-        });
+                } catch (Exception e) {
+                    post(() -> callback.onError(errorMessage(e)));
+                }
+            });
+        } catch (RuntimeException e) {
+            post(() -> callback.onError(errorMessage(e)));
+        }
     }
 
     private static void post(Runnable runnable) {
