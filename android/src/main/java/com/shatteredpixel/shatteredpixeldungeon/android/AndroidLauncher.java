@@ -207,6 +207,9 @@ public class AndroidLauncher extends AndroidApplication {
 		if (Study.service instanceof AndroidAnkiStudyService) {
 			((AndroidAnkiStudyService) Study.service).onHostDestroy();
 		}
+		if (support != null) {
+			support.stopNativeTextInputProxy();
+		}
 		super.onDestroy();
 	}
 
