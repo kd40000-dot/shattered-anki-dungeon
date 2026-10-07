@@ -15,6 +15,11 @@ permissions:
 jobs:
   android-debug:
     runs-on: ubuntu-latest
+    env:
+      SAD_SIGNING_KEYSTORE_B64: ${{ secrets.SAD_SIGNING_KEYSTORE_B64 }}
+      SAD_SIGNING_STORE_PASSWORD: ${{ secrets.SAD_SIGNING_STORE_PASSWORD }}
+      SAD_SIGNING_KEY_ALIAS: ${{ secrets.SAD_SIGNING_KEY_ALIAS }}
+      SAD_SIGNING_KEY_PASSWORD: ${{ secrets.SAD_SIGNING_KEY_PASSWORD }}
     steps:
       - uses: actions/checkout@v4
 
@@ -38,6 +43,17 @@ jobs:
       - uses: gradle/actions/setup-gradle@v4
         if: steps.gradle-project.outputs.present == 'true'
 
+      - name: Configure persistent APK signing
+        if: steps.gradle-project.outputs.present == 'true' && env.SAD_SIGNING_KEYSTORE_B64 != ''
+        shell: bash
+        run: |
+          KEYSTORE_PATH="$RUNNER_TEMP/shattered-anki-dungeon-signing.jks"
+          printf '%s' "$SAD_SIGNING_KEYSTORE_B64" | base64 --decode > "$KEYSTORE_PATH"
+          echo "SAD_SIGNING_STORE_FILE=$KEYSTORE_PATH" >> "$GITHUB_ENV"
+          echo "SAD_SIGNING_STORE_PASSWORD=$SAD_SIGNING_STORE_PASSWORD" >> "$GITHUB_ENV"
+          echo "SAD_SIGNING_KEY_ALIAS=$SAD_SIGNING_KEY_ALIAS" >> "$GITHUB_ENV"
+          echo "SAD_SIGNING_KEY_PASSWORD=$SAD_SIGNING_KEY_PASSWORD" >> "$GITHUB_ENV"
+
       - name: Run core tests
         if: steps.gradle-project.outputs.present == 'true'
         run: ./gradlew core:test
@@ -46,10 +62,18 @@ jobs:
         if: steps.gradle-project.outputs.present == 'true'
         run: ./gradlew android:assembleDebug
 
-      - name: Upload APK
-        if: steps.gradle-project.outputs.present == 'true'
+      - name: Upload installable signed APK
+        if: steps.gradle-project.outputs.present == 'true' && env.SAD_SIGNING_KEYSTORE_B64 != ''
         uses: actions/upload-artifact@v4
         with:
-          name: shattered-anki-dungeon-debug
+          name: shattered-anki-dungeon-stable-signed-debug
+          path: android/build/outputs/apk/debug/*.apk
+          if-no-files-found: error
+
+      - name: Upload ephemeral CI APK
+        if: steps.gradle-project.outputs.present == 'true' && env.SAD_SIGNING_KEYSTORE_B64 == ''
+        uses: actions/upload-artifact@v4
+        with:
+          name: shattered-anki-dungeon-ephemeral-debug-DO-NOT-INSTALL
           path: android/build/outputs/apk/debug/*.apk
           if-no-files-found: error
