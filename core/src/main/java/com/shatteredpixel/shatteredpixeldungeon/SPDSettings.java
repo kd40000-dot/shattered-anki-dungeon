@@ -223,6 +223,7 @@ public class SPDSettings extends GameSettings {
 	public static final String KEY_CUSTOM_SEED	= "custom_seed";
 	public static final String KEY_LAST_DAILY	= "last_daily";
 	public static final String KEY_INTRO		= "intro";
+	public static final String KEY_STUDY_CONJURE_FOOD = "study_conjure_food";
 
 	public static final String KEY_SUPPORT_NAGGED= "support_nagged";
 	public static final String KEY_VICTORY_NAGGED= "victory_nagged";
@@ -234,6 +235,15 @@ public class SPDSettings extends GameSettings {
 	
 	public static boolean intro() {
 		return getBoolean( KEY_INTRO, true );
+	}
+
+	/** Default for newly-created runs. The selected value is copied into the save. */
+	public static void studyConjureFood( boolean value ) {
+		put( KEY_STUDY_CONJURE_FOOD, value );
+	}
+
+	public static boolean studyConjureFood() {
+		return getBoolean( KEY_STUDY_CONJURE_FOOD, true );
 	}
 	
 	public static void lastClass( int value ) {
