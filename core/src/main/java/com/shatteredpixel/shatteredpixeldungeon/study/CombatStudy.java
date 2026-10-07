@@ -209,7 +209,9 @@ public final class CombatStudy {
                 false,
                 Messages.get(CombatStudy.class, "check"),
                 Messages.get(CombatStudy.class, "cancel"),
-                true
+                true,
+                true,
+                null
         ) {
             @Override
             public void onSelect(boolean positive, String text) {
@@ -252,26 +254,18 @@ public final class CombatStudy {
             result = Result.WRONG;
         }
 
-        String shownTyped = trimmed.isEmpty()
-                ? Messages.get(CombatStudy.class, "blank_answer")
-                : trimmed;
-
-        String body;
         String title;
         int titleColor;
 
         if (result == Result.CORRECT) {
             title = Messages.get(CombatStudy.class, "correct");
             titleColor = ItemSlot.UPGRADED;
-            body = Messages.get(CombatStudy.class, "result_correct", shownTyped, matched);
         } else if (result == Result.NEW_BLANK) {
             title = Messages.get(CombatStudy.class, "revealed");
             titleColor = ItemSlot.ENHANCED;
-            body = Messages.get(CombatStudy.class, "result_revealed", shownCard.answer);
         } else {
             title = Messages.get(CombatStudy.class, "incorrect");
             titleColor = ItemSlot.DEGRADED;
-            body = Messages.get(CombatStudy.class, "result_incorrect", shownTyped, shownCard.answer);
         }
 
         int count = Math.max(1, Math.min(4, shownCard.buttonCount));
@@ -287,7 +281,12 @@ public final class CombatStudy {
         ShatteredPixelDungeon.scene().addToFront(new WndStudyRating(
                 title,
                 titleColor,
-                body,
+                shownCard.question,
+                typed,
+                shownCard.answer,
+                result == Result.NEW_BLANK,
+                Messages.get(CombatStudy.class, "you"),
+                Messages.get(CombatStudy.class, "answer_label"),
                 options
         ) {
             @Override
