@@ -38,6 +38,10 @@ jobs:
       - uses: gradle/actions/setup-gradle@v4
         if: steps.gradle-project.outputs.present == 'true'
 
+      - name: Run core tests
+        if: steps.gradle-project.outputs.present == 'true'
+        run: ./gradlew core:test
+
       - name: Build debug APK
         if: steps.gradle-project.outputs.present == 'true'
         run: ./gradlew android:assembleDebug
