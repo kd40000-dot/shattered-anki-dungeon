@@ -255,7 +255,7 @@ public class Dungeon {
 		Random.resetGenerators();
 		
 		Statistics.reset();
-		StudyRunState.reset(SPDSettings.studyConjureFood());
+		StudyRunState.reset(SPDSettings.studyConjureFood(), SPDSettings.studyCombat());
 		Notes.reset();
 
 		quickslot.reset();
@@ -750,9 +750,9 @@ public class Dungeon {
 		Dungeon.mobsToChampion = bundle.getFloat( MOBS_TO_CHAMPION );
 
 		if (bundle.contains( STUDY_RUN )) {
-			StudyRunState.restoreFromBundle( bundle.getBundle( STUDY_RUN ), SPDSettings.studyConjureFood() );
+			StudyRunState.restoreFromBundle( bundle.getBundle( STUDY_RUN ), SPDSettings.studyConjureFood(), SPDSettings.studyCombat() );
 		} else {
-			StudyRunState.reset( SPDSettings.studyConjureFood() );
+			StudyRunState.reset( SPDSettings.studyConjureFood(), SPDSettings.studyCombat() );
 		}
 		
 		Dungeon.level = null;
