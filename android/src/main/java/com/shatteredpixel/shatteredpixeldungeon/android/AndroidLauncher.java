@@ -188,6 +188,26 @@ public class AndroidLauncher extends AndroidApplication {
 			finishAndRemoveTask();
 		}
 		super.onResume();
+
+		if (Study.service instanceof AndroidAnkiStudyService) {
+			((AndroidAnkiStudyService) Study.service).onHostResume();
+		}
+	}
+
+	@Override
+	public void onRequestPermissionsResult(int requestCode, String[] permissions, int[] grantResults) {
+		super.onRequestPermissionsResult(requestCode, permissions, grantResults);
+		if (Study.service instanceof AndroidAnkiStudyService) {
+			((AndroidAnkiStudyService) Study.service).onRequestPermissionsResult(requestCode);
+		}
+	}
+
+	@Override
+	protected void onDestroy() {
+		if (Study.service instanceof AndroidAnkiStudyService) {
+			((AndroidAnkiStudyService) Study.service).onHostDestroy();
+		}
+		super.onDestroy();
 	}
 
 	@SuppressLint("GestureBackNavigation")
