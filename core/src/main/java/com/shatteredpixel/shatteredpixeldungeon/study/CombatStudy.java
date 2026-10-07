@@ -2,10 +2,7 @@
  * Shattered Anki Dungeon
  * Copyright (C) 2026
  *
- * This program is free software: you can redistribute it and/or modify
- * it under the terms of the GNU General Public License as published by
- * the Free Software Foundation, either version 3 of the License, or
- * (at your option) any later version.
+ * GPL-3.0-or-later
  */
 
 package com.shatteredpixel.shatteredpixeldungeon.study;
@@ -21,15 +18,11 @@ import com.shatteredpixel.shatteredpixeldungeon.windows.WndTextInput;
 import com.watabou.noosa.Game;
 
 /**
- * Gates normal hero attacks behind Anki reviews.
+ * Gates normal hero attacks behind one serialized Anki review session.
  *
- * Rules mirror the existing Andor's Trail integration:
- * - Correct first try: submit the selected ease, then attack.
- * - Wrong + Hard/Good/Easy: submit that ease and lose the attack turn.
- * - Wrong + Again: do not submit yet, lose the attack turn, and keep the same
- *   card for the next attack.
- * - Correct after a retry: submit Again regardless of the pressed rating, then attack.
- * - Blank on a brand-new card: reveal/rate it, but it does not earn an attack.
+ * Every async callback carries a session token. If the player cancels, changes
+ * scene, starts another study action, or a newer session supersedes this one,
+ * stale callbacks become no-ops and can never trigger an attack.
  */
 public final class CombatStudy {
 
@@ -39,12 +32,15 @@ public final class CombatStudy {
         NEW_BLANK
     }
 
+    private static final StudySessionGuard.Owner OWNER = StudySessionGuard.Owner.COMBAT;
     private static final String[] EASE_KEYS = {"again", "hard", "good", "easy"};
 
+    private static long sessionToken;
     private static Hero pendingHero;
     private static Char pendingTarget;
     private static StudyCard card;
     private static boolean loading;
+    private static boolean submitting;
     private static boolean retryActive;
     private static Result result;
     private static long attemptStartedAt;
@@ -53,85 +49,127 @@ public final class CombatStudy {
     }
 
     /**
-     * @return true when this attack has been intercepted and will be resolved
-     * asynchronously by the study flow.
+     * @return true when this attack was intercepted by the study layer.
      */
     public static boolean interceptAttack(Hero hero, Char target) {
         if (!StudyRunState.combatEnabled()) {
             return false;
         }
 
-        if (Study.service == null || !Study.service.backendAvailable()) {
+        if (hero == null || target == null) {
             return false;
         }
 
-        pendingHero = hero;
-        pendingTarget = target;
+        if (Study.service == null || !Study.service.backendAvailable()) {
+            if (StudySessionGuard.isCurrent(OWNER, sessionToken)) {
+                finishSession(sessionToken);
+            }
+            hero.studyAttackCancelled();
+            showMessage(Messages.get(CombatStudy.class, "no_backend"));
+            return true;
+        }
 
         if (!Study.service.hasAccess()) {
-            Study.service.requestAccess();
-            showMessage(Messages.get(CombatStudy.class, "permission"));
-            cancelPendingAttack();
+            // No gameplay action or unresolved retry is kept alive across
+            // Android's permission UI.
+            if (StudySessionGuard.isCurrent(OWNER, sessionToken)) {
+                finishSession(sessionToken);
+            }
+            hero.studyAttackCancelled();
+            Study.service.requestAccess((granted, message) ->
+                    showMessage(message == null ? "" : message));
             return true;
         }
 
-        if (card != null) {
-            showQuestion();
+        if (StudySessionGuard.isCurrent(OWNER, sessionToken)) {
+            // A wrong+Again intentionally holds the card for the next attack.
+            if (retryActive && card != null && pendingHero == null && !loading && !submitting) {
+                pendingHero = hero;
+                pendingTarget = target;
+                showQuestion(sessionToken);
+            } else {
+                // Any other re-entry is stale/duplicate input. Cancel it rather
+                // than replacing the action currently owned by the session.
+                hero.studyAttackCancelled();
+            }
             return true;
         }
 
-        if (loading) {
+        if (StudySessionGuard.busy()) {
+            hero.studyAttackCancelled();
+            showMessage(Messages.get(CombatStudy.class, "busy"));
             return true;
+        }
+
+        long token = StudySessionGuard.begin(OWNER);
+        if (token == 0L) {
+            hero.studyAttackCancelled();
+            return true;
+        }
+
+        clearLocalState(false);
+        sessionToken = token;
+        pendingHero = hero;
+        pendingTarget = target;
+        loadNextCard(token);
+        return true;
+    }
+
+    public static void reset() {
+        if (StudySessionGuard.isCurrent(OWNER, sessionToken)) {
+            StudySessionGuard.finish(OWNER, sessionToken);
+        }
+        clearLocalState(true);
+    }
+
+    private static void loadNextCard(final long token) {
+        if (!isCurrent(token)) {
+            return;
         }
 
         loading = true;
         Study.service.loadNextCard(new StudyService.CardCallback() {
             @Override
             public void onCardLoaded(StudyCard loaded) {
+                if (!isCurrent(token)) return;
                 loading = false;
+                if (loaded == null) {
+                    failSession(token, Messages.get(CombatStudy.class, "load_error"));
+                    return;
+                }
                 card = loaded;
-                showQuestion();
+                showQuestion(token);
             }
 
             @Override
             public void onNoCardsDue() {
+                if (!isCurrent(token)) return;
                 loading = false;
-                approvePendingAttack();
+                approvePendingAttack(token);
             }
 
             @Override
             public void onError(String message) {
+                if (!isCurrent(token)) return;
                 loading = false;
-                showMessage(Messages.get(CombatStudy.class, "fallback", message));
-                approvePendingAttack();
+                failSession(token, Messages.get(CombatStudy.class, "provider_error", safe(message)));
             }
         });
-
-        return true;
     }
 
-    public static void reset() {
-        pendingHero = null;
-        pendingTarget = null;
-        card = null;
-        loading = false;
-        retryActive = false;
-        result = null;
-        attemptStartedAt = 0L;
-    }
-
-    private static void showQuestion() {
-        if (pendingHero == null || pendingTarget == null || card == null) {
-            cancelPendingAttack();
+    private static void showQuestion(final long token) {
+        if (!isCurrent(token) || pendingHero == null || pendingTarget == null || card == null) {
+            cancelSession(token);
             return;
         }
 
         result = null;
         attemptStartedAt = Game.realTime;
+        final StudyCard shownCard = card;
 
         ShatteredPixelDungeon.scene().addToFront(new WndTextInput(
                 Messages.get(CombatStudy.class, "title"),
-                card.question,
+                shownCard.question,
                 "",
                 512,
                 false,
@@ -141,27 +179,34 @@ public final class CombatStudy {
         ) {
             @Override
             public void onSelect(boolean positive, String text) {
+                if (!isCurrent(token) || card != shownCard) return;
                 if (!positive) {
-                    cancelPendingAttack();
+                    cancelSession(token);
                     return;
                 }
-                if (pendingHero == null || card == null) return;
-                revealAnswer(text == null ? "" : text);
+                revealAnswer(token, shownCard, text == null ? "" : text);
             }
 
             @Override
             public void onBackPressed() {
-                cancelPendingAttack();
+                cancelSession(token);
                 hide();
+            }
+
+            @Override
+            protected void onDismissed() {
+                cancelSession(token);
             }
         });
     }
 
-    private static void revealAnswer(String typed) {
-        String trimmed = typed.trim();
-        String matched = TypedAnswerMatcher.matchedAlternative(trimmed, card.answer);
+    private static void revealAnswer(final long token, final StudyCard shownCard, String typed) {
+        if (!isCurrent(token) || card != shownCard) return;
 
-        if (trimmed.isEmpty() && card.reps == 0 && !retryActive) {
+        String trimmed = typed.trim();
+        String matched = TypedAnswerMatcher.matchedAlternative(trimmed, shownCard.answer);
+
+        if (trimmed.isEmpty() && shownCard.reps == 0 && !retryActive) {
             result = Result.NEW_BLANK;
         } else if (matched != null) {
             result = Result.CORRECT;
@@ -184,19 +229,18 @@ public final class CombatStudy {
         } else if (result == Result.NEW_BLANK) {
             title = Messages.get(CombatStudy.class, "revealed");
             titleColor = ItemSlot.ENHANCED;
-            body = Messages.get(CombatStudy.class, "result_revealed", card.answer);
+            body = Messages.get(CombatStudy.class, "result_revealed", shownCard.answer);
         } else {
             title = Messages.get(CombatStudy.class, "incorrect");
             titleColor = ItemSlot.DEGRADED;
-            body = Messages.get(CombatStudy.class, "result_incorrect", shownTyped, card.answer);
+            body = Messages.get(CombatStudy.class, "result_incorrect", shownTyped, shownCard.answer);
         }
 
-        int count = Math.max(1, Math.min(4, card.buttonCount));
+        int count = Math.max(1, Math.min(4, shownCard.buttonCount));
         String[] options = new String[count];
-
         for (int i = 0; i < count; i++) {
             String label = Messages.get(CombatStudy.class, EASE_KEYS[i]);
-            String interval = i < card.nextReviewTimes.length ? card.nextReviewTimes[i] : "";
+            String interval = i < shownCard.nextReviewTimes.length ? shownCard.nextReviewTimes[i] : "";
             options[i] = interval == null || interval.trim().isEmpty()
                     ? label
                     : label + "\n" + interval;
@@ -210,46 +254,57 @@ public final class CombatStudy {
         ) {
             @Override
             protected void onSelect(int index) {
-                chooseEase(index + 1);
+                if (!isCurrent(token) || card != shownCard) return;
+                chooseEase(token, shownCard, index + 1);
             }
 
             @Override
             protected void onCancelled() {
-                cancelPendingAttack();
+                cancelSession(token);
             }
         });
     }
 
-    private static void chooseEase(int pressedEase) {
-        if (card == null || result == null || pendingHero == null) {
-            cancelPendingAttack();
+    private static void chooseEase(final long token, final StudyCard shownCard, int pressedEase) {
+        if (!isCurrent(token) || card != shownCard || result == null || pendingHero == null) {
+            cancelSession(token);
             return;
         }
 
         if (result == Result.WRONG && pressedEase == 1) {
             retryActive = true;
             result = null;
-            failPendingAttack(true);
+
+            Hero hero = pendingHero;
+            pendingHero = null;
+            pendingTarget = null;
+
+            // The session and unresolved card intentionally remain owned by
+            // combat so the next attack retries this exact card.
+            if (hero != null) {
+                hero.studyAttackFailed();
+            }
             return;
         }
+
+        submitting = true;
 
         final int effectiveEase =
                 result == Result.CORRECT && retryActive ? 1 : pressedEase;
         final boolean shouldAttack = result == Result.CORRECT;
-        final StudyCard resolvedCard = card;
         final Hero hero = pendingHero;
         final Char target = pendingTarget;
         final long timeTaken = Math.max(0L, Game.realTime - attemptStartedAt);
 
-        Study.service.answer(resolvedCard, effectiveEase, timeTaken, new StudyService.AnswerCallback() {
+        Study.service.answer(shownCard, effectiveEase, timeTaken, new StudyService.AnswerCallback() {
             @Override
             public void onAnswered() {
-                card = null;
-                retryActive = false;
-                result = null;
-                pendingHero = null;
-                pendingTarget = null;
+                if (!isCurrent(token) || card != shownCard) return;
 
+                submitting = false;
+                finishSession(token);
+
+                if (hero == null) return;
                 if (shouldAttack) {
                     hero.studyAttackApproved(target);
                 } else {
@@ -259,62 +314,76 @@ public final class CombatStudy {
 
             @Override
             public void onError(String message) {
-                showMessage(Messages.get(CombatStudy.class, "save_error", message));
-                // Keep the card unresolved so another attack can retry it.
-                result = null;
-                pendingHero = null;
-                pendingTarget = null;
-                hero.studyAttackCancelled();
+                if (!isCurrent(token)) return;
+                submitting = false;
+                failSession(token, Messages.get(CombatStudy.class, "save_error", safe(message)));
             }
         });
     }
 
-    private static void approvePendingAttack() {
+    private static void approvePendingAttack(long token) {
+        if (!isCurrent(token)) return;
+
         Hero hero = pendingHero;
         Char target = pendingTarget;
-
-        pendingHero = null;
-        pendingTarget = null;
-        card = null;
-        retryActive = false;
-        result = null;
+        finishSession(token);
 
         if (hero != null) {
             hero.studyAttackApproved(target);
         }
     }
 
-    private static void failPendingAttack(boolean keepCard) {
+    private static void failSession(long token, String message) {
+        if (!isCurrent(token)) return;
         Hero hero = pendingHero;
-
-        pendingHero = null;
-        pendingTarget = null;
-        result = null;
-
-        if (!keepCard) {
-            card = null;
-            retryActive = false;
-        }
-
+        finishSession(token);
         if (hero != null) {
-            hero.studyAttackFailed();
+            hero.studyAttackCancelled();
         }
+        showMessage(message);
     }
 
-    private static void cancelPendingAttack() {
+    private static void cancelSession(long token) {
+        if (!isCurrent(token)) return;
         Hero hero = pendingHero;
-        pendingHero = null;
-        pendingTarget = null;
-        result = null;
-
+        finishSession(token);
         if (hero != null) {
             hero.studyAttackCancelled();
         }
     }
 
+    private static void finishSession(long token) {
+        if (!isCurrent(token)) return;
+        StudySessionGuard.finish(OWNER, token);
+        clearLocalState(true);
+    }
+
+    private static boolean isCurrent(long token) {
+        return StudySessionGuard.isCurrent(OWNER, token) && sessionToken == token;
+    }
+
+    private static void clearLocalState(boolean clearToken) {
+        pendingHero = null;
+        pendingTarget = null;
+        card = null;
+        loading = false;
+        submitting = false;
+        retryActive = false;
+        result = null;
+        attemptStartedAt = 0L;
+        if (clearToken) {
+            sessionToken = 0L;
+        }
+    }
+
     private static void showMessage(String message) {
+        if (message == null || message.trim().isEmpty()) return;
         if (ShatteredPixelDungeon.scene() != null) {
             ShatteredPixelDungeon.scene().addToFront(new WndMessage(message));
         }
+    }
+
+    private static String safe(String value) {
+        return value == null ? "" : value;
     }
 }

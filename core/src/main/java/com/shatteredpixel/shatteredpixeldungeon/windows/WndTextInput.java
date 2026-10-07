@@ -35,6 +35,8 @@ import com.watabou.utils.DeviceCompat;
 
 public class WndTextInput extends Window {
 
+	private boolean selectionResolved;
+
 	private static final int WIDTH = 135;
 	private static final int W_LAND_EXTRA = 220; //extra width is sometimes used in landscape
 	private static final int MARGIN = 1;
@@ -87,6 +89,8 @@ public class WndTextInput extends Window {
 		textBox = new TextInput(Chrome.get(Chrome.Type.TOAST_WHITE), multiLine, textSize, nativeImeProxy){
 			@Override
 			public void enterPressed() {
+				if (selectionResolved) return;
+				selectionResolved = true;
 				//triggers positive action on enter pressed, only with non-multiline though.
 				onSelect(true, getText());
 				hide();
@@ -179,6 +183,8 @@ public class WndTextInput extends Window {
 		final RedButton positiveBtn = new RedButton(posTxt) {
 			@Override
 			protected void onClick() {
+				if (selectionResolved) return;
+				selectionResolved = true;
 				onSelect(true, textBox.getText());
 				hide();
 			}
@@ -189,6 +195,8 @@ public class WndTextInput extends Window {
 			negativeBtn = new RedButton(negTxt) {
 				@Override
 				protected void onClick() {
+					if (selectionResolved) return;
+					selectionResolved = true;
 					onSelect(false, textBox.getText());
 					hide();
 				}
@@ -235,8 +243,20 @@ public class WndTextInput extends Window {
 
 	public void onSelect(boolean positive, String text){ }
 
+	/** Called only when the window disappears without a positive/negative selection. */
+	protected void onDismissed(){ }
+
 	@Override
 	public void onBackPressed() {
 		//Do nothing, prevents accidentally losing writing
+	}
+
+	@Override
+	public void destroy() {
+		if (!selectionResolved) {
+			selectionResolved = true;
+			onDismissed();
+		}
+		super.destroy();
 	}
 }

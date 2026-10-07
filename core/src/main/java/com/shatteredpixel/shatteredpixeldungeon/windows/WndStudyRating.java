@@ -23,6 +23,8 @@ import com.shatteredpixel.shatteredpixeldungeon.ui.Window;
  */
 public abstract class WndStudyRating extends Window {
 
+    private boolean resolved;
+
     private static final int WIDTH_P = 132;
     private static final int WIDTH_L = 160;
     private static final int MARGIN = 2;
@@ -62,6 +64,8 @@ public abstract class WndStudyRating extends Window {
             StyledButton button = new StyledButton(Chrome.Type.GREY_BUTTON, options[i], 8) {
                 @Override
                 protected void onClick() {
+                    if (resolved) return;
+                    resolved = true;
                     hide();
                     onSelect(index);
                 }
@@ -83,7 +87,18 @@ public abstract class WndStudyRating extends Window {
 
     @Override
     public void onBackPressed() {
-        hide();
+        if (resolved) return;
+        resolved = true;
         onCancelled();
+        hide();
+    }
+
+    @Override
+    public void destroy() {
+        if (!resolved) {
+            resolved = true;
+            onCancelled();
+        }
+        super.destroy();
     }
 }

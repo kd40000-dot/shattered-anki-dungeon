@@ -2,32 +2,31 @@
  * Shattered Anki Dungeon
  * Copyright (C) 2026
  *
- * This program is free software: you can redistribute it and/or modify
- * it under the terms of the GNU General Public License as published by
- * the Free Software Foundation, either version 3 of the License, or
- * (at your option) any later version.
+ * GPL-3.0-or-later
  */
 
 package com.shatteredpixel.shatteredpixeldungeon.android.study;
 
 import android.app.Activity;
-import android.app.AlertDialog;
-import android.content.DialogInterface;
 import android.os.Build;
-import android.text.Html;
-import android.view.Window;
-import android.view.WindowManager;
-import android.view.inputmethod.EditorInfo;
-import android.widget.EditText;
 
+import com.badlogic.gdx.Application;
 import com.badlogic.gdx.Gdx;
 import com.shatteredpixel.shatteredpixeldungeon.study.StudyCard;
 import com.shatteredpixel.shatteredpixeldungeon.study.StudyService;
 
+import java.util.ArrayList;
+import java.util.List;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 
-/** Android implementation of the core study service, backed by AnkiDroid. */
+/**
+ * Android implementation of the core study service.
+ *
+ * All ContentProvider I/O is serialized on one worker thread. Permission
+ * requests are explicitly completed through onRequestPermissionsResult so no
+ * gameplay action survives across the Android permission dialog.
+ */
 public final class AndroidAnkiStudyService implements StudyService {
 
     public static final int REQUEST_ANKI_DATABASE_PERMISSION = 0x5341;
@@ -35,26 +34,35 @@ public final class AndroidAnkiStudyService implements StudyService {
     private final Activity activity;
     private final ExecutorService worker = Executors.newSingleThreadExecutor();
 
+    private final Object permissionLock = new Object();
+    private final List<AccessCallback> pendingAccessCallbacks = new ArrayList<>();
+    private boolean permissionRequestInFlight;
+    private volatile boolean destroyed;
+
     public AndroidAnkiStudyService(Activity activity) {
         this.activity = activity;
     }
 
     private AndroidAnkiBridge connect() {
-        return AndroidAnkiBridge.connect(activity);
+        try {
+            return AndroidAnkiBridge.connect(activity);
+        } catch (RuntimeException e) {
+            return null;
+        }
     }
 
     @Override
     public boolean backendAvailable() {
-        return AndroidAnkiBridge.discoverBackend(activity) != null;
+        return connect() != null;
     }
 
     @Override
     public String backendName() {
-        AndroidAnkiBridge.BackendInfo backend = AndroidAnkiBridge.discoverBackend(activity);
-        if (backend == null) {
+        AndroidAnkiBridge bridge = connect();
+        if (bridge == null) {
             return "Unavailable";
         }
-        return backend.kind == AndroidAnkiBridge.BackendKind.RETRY
+        return bridge.backend().kind == AndroidAnkiBridge.BackendKind.RETRY
                 ? "AnkiDroid Retry"
                 : "AnkiDroid";
     }
@@ -62,105 +70,127 @@ public final class AndroidAnkiStudyService implements StudyService {
     @Override
     public boolean hasAccess() {
         AndroidAnkiBridge bridge = connect();
-        return bridge != null && bridge.hasPermission();
-    }
-
-    @Override
-    public boolean requestAccess() {
-        AndroidAnkiBridge bridge = connect();
         if (bridge == null) {
             return false;
         }
-        if (bridge.hasPermission()) {
-            return true;
+        try {
+            return bridge.hasPermission();
+        } catch (RuntimeException e) {
+            return false;
         }
-
-        // LibGDX gameplay runs on the GL/render thread. Android permission UI
-        // must be launched on the Activity's UI thread.
-        activity.runOnUiThread(() -> {
-            AndroidAnkiBridge current = connect();
-            if (current != null && !current.hasPermission()) {
-                current.requestPermission(activity, REQUEST_ANKI_DATABASE_PERMISSION);
-            }
-        });
-        return false;
     }
 
     @Override
-    public void requestTypedAnswer(
-            String title,
-            String prompt,
-            String positiveLabel,
-            String negativeLabel,
-            TextInputCallback callback
-    ) {
+    public boolean requestAccess(AccessCallback callback) {
+        if (destroyed) {
+            postAccess(callback, false, "The game activity is shutting down.");
+            return false;
+        }
+
+        AndroidAnkiBridge bridge = connect();
+        if (bridge == null) {
+            postAccess(callback, false, "No compatible AnkiDroid installation was found.");
+            return false;
+        }
+
+        if (bridge.hasPermission()) {
+            postAccess(callback, true, "AnkiDroid access is ready.");
+            return true;
+        }
+
+        synchronized (permissionLock) {
+            if (callback != null) {
+                pendingAccessCallbacks.add(callback);
+            }
+            if (permissionRequestInFlight) {
+                return false;
+            }
+            permissionRequestInFlight = true;
+        }
+
         activity.runOnUiThread(() -> {
-            final boolean[] resolved = {false};
-
-            EditText input = new EditText(activity);
-            input.setSingleLine(true);
-            input.setImeOptions(EditorInfo.IME_ACTION_DONE);
-            input.setSelectAllOnFocus(false);
-
-            CharSequence message;
-            String htmlPrompt = prompt == null ? "" : prompt.replace("\n", "<br>");
-            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.N) {
-                message = Html.fromHtml(htmlPrompt, Html.FROM_HTML_MODE_LEGACY);
-            } else {
-                //noinspection deprecation
-                message = Html.fromHtml(htmlPrompt);
+            if (activity.isFinishing()
+                    || (Build.VERSION.SDK_INT >= Build.VERSION_CODES.JELLY_BEAN_MR1 && activity.isDestroyed())) {
+                finishAccessRequest(false, "The game activity is not available.");
+                return;
             }
 
-            AlertDialog dialog = new AlertDialog.Builder(activity)
-                    .setTitle(title)
-                    .setMessage(message)
-                    .setView(input)
-                    .setPositiveButton(positiveLabel, null)
-                    .setNegativeButton(negativeLabel, (d, which) -> {
-                        if (!resolved[0]) {
-                            resolved[0] = true;
-                            post(callback::onCancelled);
-                        }
-                    })
-                    .create();
+            AndroidAnkiBridge current = connect();
+            if (current == null) {
+                finishAccessRequest(false, "No compatible AnkiDroid installation was found.");
+                return;
+            }
+            if (current.hasPermission()) {
+                finishAccessRequest(true, "AnkiDroid access is ready.");
+                return;
+            }
 
-            dialog.setCanceledOnTouchOutside(false);
-            dialog.setOnCancelListener(d -> {
-                if (!resolved[0]) {
-                    resolved[0] = true;
-                    post(callback::onCancelled);
-                }
-            });
-
-            dialog.setOnShowListener(d -> {
-                dialog.getButton(DialogInterface.BUTTON_POSITIVE).setOnClickListener(v -> {
-                    if (resolved[0]) return;
-                    resolved[0] = true;
-                    String value = input.getText() == null ? "" : input.getText().toString();
-                    dialog.dismiss();
-                    post(() -> callback.onSubmitted(value));
-                });
-
-                input.setOnEditorActionListener((v, actionId, event) -> {
-                    if (actionId == EditorInfo.IME_ACTION_DONE && !resolved[0]) {
-                        resolved[0] = true;
-                        String value = input.getText() == null ? "" : input.getText().toString();
-                        dialog.dismiss();
-                        post(() -> callback.onSubmitted(value));
-                        return true;
-                    }
-                    return false;
-                });
-
-                input.requestFocus();
-                Window window = dialog.getWindow();
-                if (window != null) {
-                    window.setSoftInputMode(WindowManager.LayoutParams.SOFT_INPUT_STATE_ALWAYS_VISIBLE);
-                }
-            });
-
-            dialog.show();
+            try {
+                current.requestPermission(activity, REQUEST_ANKI_DATABASE_PERMISSION);
+            } catch (RuntimeException e) {
+                finishAccessRequest(false, errorMessage(e));
+            }
         });
+
+        return false;
+    }
+
+    /**
+     * Called by AndroidLauncher. Returns true when this result belonged to the
+     * Anki permission request.
+     */
+    public boolean onRequestPermissionsResult(int requestCode) {
+        if (requestCode != REQUEST_ANKI_DATABASE_PERMISSION) {
+            return false;
+        }
+
+        boolean granted = hasAccess();
+        finishAccessRequest(
+                granted,
+                granted
+                        ? "AnkiDroid access granted. Try the study action again."
+                        : "AnkiDroid access was not granted."
+        );
+        return true;
+    }
+
+    /** Covers OEMs that resume the Activity before dispatching the callback. */
+    public void onHostResume() {
+        boolean shouldReconcile;
+        synchronized (permissionLock) {
+            shouldReconcile = permissionRequestInFlight;
+        }
+        if (shouldReconcile && hasAccess()) {
+            finishAccessRequest(true, "AnkiDroid access granted. Try the study action again.");
+        }
+    }
+
+    public void onHostDestroy() {
+        destroyed = true;
+        finishAccessRequest(false, "The game closed before AnkiDroid access finished.");
+        worker.shutdownNow();
+    }
+
+    private void finishAccessRequest(boolean granted, String message) {
+        List<AccessCallback> callbacks;
+        synchronized (permissionLock) {
+            if (!permissionRequestInFlight && pendingAccessCallbacks.isEmpty()) {
+                return;
+            }
+            permissionRequestInFlight = false;
+            callbacks = new ArrayList<>(pendingAccessCallbacks);
+            pendingAccessCallbacks.clear();
+        }
+
+        for (AccessCallback callback : callbacks) {
+            postAccess(callback, granted, message);
+        }
+    }
+
+    private static void postAccess(AccessCallback callback, boolean granted, String message) {
+        if (callback != null) {
+            post(() -> callback.onAccessResult(granted, message));
+        }
     }
 
     @Override
@@ -175,9 +205,15 @@ public final class AndroidAnkiStudyService implements StudyService {
             return;
         }
 
-        worker.execute(() -> {
-            try {
-                AndroidAnkiBridge.ReviewCard card = bridge.loadNextCard();
+        if (destroyed) {
+            post(() -> callback.onError("The game activity is shutting down."));
+            return;
+        }
+
+        try {
+            worker.execute(() -> {
+                try {
+                    AndroidAnkiBridge.ReviewCard card = bridge.loadNextCard();
                 if (card == null) {
                     post(callback::onNoCardsDue);
                     return;
@@ -194,10 +230,13 @@ public final class AndroidAnkiStudyService implements StudyService {
                         card.mediaFiles
                 );
                 post(() -> callback.onCardLoaded(studyCard));
-            } catch (Exception e) {
-                post(() -> callback.onError(errorMessage(e)));
-            }
-        });
+                } catch (Exception e) {
+                    post(() -> callback.onError(errorMessage(e)));
+                }
+            });
+        } catch (RuntimeException e) {
+            post(() -> callback.onError(errorMessage(e)));
+        }
     }
 
     @Override
@@ -217,24 +256,37 @@ public final class AndroidAnkiStudyService implements StudyService {
             return;
         }
 
-        worker.execute(() -> {
-            try {
-                if (bridge.answer(card.noteId, card.ord, ease, timeTakenMs)) {
+        if (destroyed) {
+            post(() -> callback.onError("The game activity is shutting down."));
+            return;
+        }
+
+        try {
+            worker.execute(() -> {
+                try {
+                    if (bridge.answer(card.noteId, card.ord, ease, timeTakenMs)) {
                     post(callback::onAnswered);
                 } else {
                     post(() -> callback.onError("AnkiDroid did not accept the review result."));
                 }
-            } catch (Exception e) {
-                post(() -> callback.onError(errorMessage(e)));
-            }
-        });
+                } catch (Exception e) {
+                    post(() -> callback.onError(errorMessage(e)));
+                }
+            });
+        } catch (RuntimeException e) {
+            post(() -> callback.onError(errorMessage(e)));
+        }
     }
 
     private static void post(Runnable runnable) {
-        if (Gdx.app != null) {
-            Gdx.app.postRunnable(runnable);
-        } else {
-            runnable.run();
+        Application app = Gdx.app;
+        if (app == null) {
+            return;
+        }
+        try {
+            app.postRunnable(runnable);
+        } catch (RuntimeException ignored) {
+            // The Activity/render loop is shutting down; stale callbacks are dropped.
         }
     }
 

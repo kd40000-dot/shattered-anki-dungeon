@@ -2,10 +2,7 @@
  * Shattered Anki Dungeon
  * Copyright (C) 2026
  *
- * This program is free software: you can redistribute it and/or modify
- * it under the terms of the GNU General Public License as published by
- * the Free Software Foundation, either version 3 of the License, or
- * (at your option) any later version.
+ * GPL-3.0-or-later
  */
 
 package com.shatteredpixel.shatteredpixeldungeon.study;
@@ -15,35 +12,43 @@ import com.shatteredpixel.shatteredpixeldungeon.GamesInProgress;
 import com.shatteredpixel.shatteredpixeldungeon.ShatteredPixelDungeon;
 import com.shatteredpixel.shatteredpixeldungeon.items.food.ConjuredRation;
 import com.shatteredpixel.shatteredpixeldungeon.messages.Messages;
+import com.shatteredpixel.shatteredpixeldungeon.ui.ItemSlot;
 import com.shatteredpixel.shatteredpixeldungeon.utils.GLog;
 import com.shatteredpixel.shatteredpixeldungeon.windows.WndMessage;
-import com.shatteredpixel.shatteredpixeldungeon.ui.ItemSlot;
 import com.shatteredpixel.shatteredpixeldungeon.windows.WndStudyRating;
 import com.shatteredpixel.shatteredpixeldungeon.windows.WndTextInput;
 import com.watabou.noosa.Game;
 
 /**
- * Native-SPD UI flow for the Conjure Food review session.
- *
- * Provider I/O is delegated to StudyService, so this class has no Android or
- * AnkiDroid package dependencies.
+ * Serialized Conjure Food review session with stale-callback protection.
  */
 public final class ConjureFoodStudy {
 
+    private static final StudySessionGuard.Owner OWNER = StudySessionGuard.Owner.CONJURE_FOOD;
     private static final String[] EASE_KEYS = {"again", "hard", "good", "easy"};
 
+    private static long sessionToken;
     private static boolean sessionActive;
+    private static boolean loading;
+    private static boolean submitting;
     private static long cardShownAt;
 
     private ConjureFoodStudy() {
     }
 
     public static boolean sessionActive() {
-        return sessionActive;
+        return sessionActive && isCurrent(sessionToken);
+    }
+
+    public static void reset() {
+        if (StudySessionGuard.isCurrent(OWNER, sessionToken)) {
+            StudySessionGuard.finish(OWNER, sessionToken);
+        }
+        clearLocalState();
     }
 
     public static void start() {
-        if (sessionActive || !StudyRunState.conjureFoodEnabled()) {
+        if (!StudyRunState.conjureFoodEnabled()) {
             return;
         }
 
@@ -53,44 +58,67 @@ public final class ConjureFoodStudy {
         }
 
         if (!Study.service.hasAccess()) {
-            Study.service.requestAccess();
-            showMessage(Messages.get(ConjureFoodStudy.class, "permission"));
+            // Do not create a gameplay session until Android permission handling
+            // is completely finished.
+            Study.service.requestAccess((granted, message) ->
+                    showMessage(message == null ? "" : message));
             return;
         }
 
+        if (StudySessionGuard.busy()) {
+            showMessage(Messages.get(ConjureFoodStudy.class, "busy"));
+            return;
+        }
+
+        long token = StudySessionGuard.begin(OWNER);
+        if (token == 0L) return;
+
+        sessionToken = token;
         sessionActive = true;
-        loadNextCard();
+        loading = false;
+        submitting = false;
+        loadNextCard(token);
     }
 
-    private static void loadNextCard() {
-        if (!sessionActive) {
+    private static void loadNextCard(final long token) {
+        if (!isCurrent(token) || loading || submitting) {
             return;
         }
 
+        loading = true;
         Study.service.loadNextCard(new StudyService.CardCallback() {
             @Override
             public void onCardLoaded(StudyCard card) {
-                if (!sessionActive) {
+                if (!isCurrent(token)) return;
+                loading = false;
+                if (card == null) {
+                    fail(token, Messages.get(ConjureFoodStudy.class, "load_error"));
                     return;
                 }
                 cardShownAt = Game.realTime;
-                showQuestion(card);
+                showQuestion(token, card);
             }
 
             @Override
             public void onNoCardsDue() {
-                sessionActive = false;
+                if (!isCurrent(token)) return;
+                loading = false;
+                finish(token);
                 showMessage(Messages.get(ConjureFoodStudy.class, "no_cards"));
             }
 
             @Override
             public void onError(String message) {
-                fail(message);
+                if (!isCurrent(token)) return;
+                loading = false;
+                fail(token, Messages.get(ConjureFoodStudy.class, "error", safe(message)));
             }
         });
     }
 
-    private static void showQuestion(final StudyCard card) {
+    private static void showQuestion(final long token, final StudyCard card) {
+        if (!isCurrent(token)) return;
+
         int completed = StudyRunState.reviewsTowardNext();
         int required = StudyRunState.reviewsRequired();
 
@@ -114,23 +142,30 @@ public final class ConjureFoodStudy {
         ) {
             @Override
             public void onSelect(boolean positive, String text) {
+                if (!isCurrent(token)) return;
                 if (!positive) {
-                    sessionActive = false;
+                    cancel(token);
                     return;
                 }
-                if (!sessionActive) return;
-                showRating(card, text == null ? "" : text);
+                showRating(token, card, text == null ? "" : text);
             }
 
             @Override
             public void onBackPressed() {
-                sessionActive = false;
+                cancel(token);
                 hide();
+            }
+
+            @Override
+            protected void onDismissed() {
+                cancel(token);
             }
         });
     }
 
-    private static void showRating(final StudyCard card, String typed) {
+    private static void showRating(final long token, final StudyCard card, String typed) {
+        if (!isCurrent(token)) return;
+
         String matched = TypedAnswerMatcher.matchedAlternative(typed, card.answer);
         boolean correct = matched != null;
 
@@ -163,44 +198,64 @@ public final class ConjureFoodStudy {
         ) {
             @Override
             protected void onSelect(int index) {
-                submitRating(card, index + 1);
+                if (!isCurrent(token)) return;
+                submitRating(token, card, index + 1);
             }
 
             @Override
             protected void onCancelled() {
-                sessionActive = false;
+                cancel(token);
             }
         });
     }
 
-    private static void submitRating(final StudyCard card, int ease) {
+    private static void submitRating(final long token, final StudyCard card, int ease) {
+        if (!isCurrent(token) || submitting) return;
+        submitting = true;
+
         long elapsed = Math.max(0L, Game.realTime - cardShownAt);
 
         Study.service.answer(card, ease, elapsed, new StudyService.AnswerCallback() {
             @Override
             public void onAnswered() {
-                boolean completedRation = StudyRunState.recordResolvedReview();
+                if (!isCurrent(token)) return;
+                submitting = false;
 
-                // Persist study progression immediately. SPD can reload the run when
-                // changing scenes/floors, so progression must never depend on a later autosave.
-                Dungeon.saveGame(GamesInProgress.curSlot);
+                boolean completedRation = StudyRunState.recordResolvedReview();
+                persistProgressSafely();
 
                 if (completedRation) {
-                    sessionActive = false;
+                    finish(token);
                     grantRation();
                 } else {
-                    loadNextCard();
+                    loadNextCard(token);
                 }
             }
 
             @Override
             public void onError(String message) {
-                fail(message);
+                if (!isCurrent(token)) return;
+                submitting = false;
+                fail(token, Messages.get(ConjureFoodStudy.class, "error", safe(message)));
             }
         });
     }
 
+    private static void persistProgressSafely() {
+        try {
+            Dungeon.saveGame(GamesInProgress.curSlot);
+        } catch (Exception e) {
+            Game.reportException(e);
+            GLog.w(Messages.get(ConjureFoodStudy.class, "save_warning"));
+        }
+    }
+
     private static void grantRation() {
+        if (Dungeon.hero == null || Dungeon.level == null) {
+            GLog.w(Messages.get(ConjureFoodStudy.class, "reward_deferred"));
+            return;
+        }
+
         ConjuredRation ration = new ConjuredRation();
         boolean collected = ration.collect();
 
@@ -224,18 +279,45 @@ public final class ConjureFoodStudy {
         showMessage(message);
     }
 
-    private static void fail(String detail) {
+    private static void fail(long token, String detail) {
+        if (!isCurrent(token)) return;
+        finish(token);
+        showMessage(detail);
+    }
+
+    private static void cancel(long token) {
+        if (!isCurrent(token)) return;
+        finish(token);
+    }
+
+    private static void finish(long token) {
+        if (!isCurrent(token)) return;
+        StudySessionGuard.finish(OWNER, token);
+        clearLocalState();
+    }
+
+    private static boolean isCurrent(long token) {
+        return sessionActive
+                && sessionToken == token
+                && StudySessionGuard.isCurrent(OWNER, token);
+    }
+
+    private static void clearLocalState() {
+        sessionToken = 0L;
         sessionActive = false;
-        showMessage(Messages.get(
-                ConjureFoodStudy.class,
-                "error",
-                detail == null ? "" : detail
-        ));
+        loading = false;
+        submitting = false;
+        cardShownAt = 0L;
     }
 
     private static void showMessage(String message) {
+        if (message == null || message.trim().isEmpty()) return;
         if (ShatteredPixelDungeon.scene() != null) {
             ShatteredPixelDungeon.scene().addToFront(new WndMessage(message));
         }
+    }
+
+    private static String safe(String value) {
+        return value == null ? "" : value;
     }
 }

@@ -58,8 +58,9 @@ public class AndroidPlatformSupport extends PlatformSupport {
 
 	private EditText nativeTextInputProxy;
 	private TextWatcher nativeTextInputWatcher;
-	private NativeTextInputListener nativeTextInputListener;
+	private volatile NativeTextInputListener nativeTextInputListener;
 	private boolean nativeTextInputUpdating;
+	private volatile long nativeTextInputGeneration;
 
 	
 	public void updateDisplaySize(){
@@ -220,6 +221,8 @@ public class AndroidPlatformSupport extends PlatformSupport {
 		AndroidLauncher.instance.runOnUiThread(() -> {
 			stopNativeTextInputProxyOnUiThread();
 
+			final long generation = ++nativeTextInputGeneration;
+			final NativeTextInputListener sessionListener = listener;
 			nativeTextInputListener = listener;
 			EditText input = new EditText(AndroidLauncher.instance);
 			nativeTextInputProxy = input;
@@ -244,9 +247,11 @@ public class AndroidPlatformSupport extends PlatformSupport {
 				public void afterTextChanged(Editable s) {
 					if (nativeTextInputUpdating || nativeTextInputListener == null) return;
 					String value = s == null ? "" : s.toString();
+					if (Gdx.app == null) return;
 					Gdx.app.postRunnable(() -> {
-						if (nativeTextInputListener != null) {
-							nativeTextInputListener.onTextChanged(value);
+						if (nativeTextInputGeneration == generation
+								&& nativeTextInputListener == sessionListener) {
+							sessionListener.onTextChanged(value);
 						}
 					});
 				}
@@ -256,11 +261,14 @@ public class AndroidPlatformSupport extends PlatformSupport {
 			if (!multiline) {
 				input.setOnEditorActionListener((v, actionId, event) -> {
 					if (actionId == EditorInfo.IME_ACTION_DONE) {
-						Gdx.app.postRunnable(() -> {
-							if (nativeTextInputListener != null) {
-								nativeTextInputListener.onEnterPressed();
-							}
-						});
+						if (Gdx.app != null) {
+							Gdx.app.postRunnable(() -> {
+								if (nativeTextInputGeneration == generation
+										&& nativeTextInputListener == sessionListener) {
+									sessionListener.onEnterPressed();
+								}
+							});
+						}
 						return true;
 					}
 					return false;
@@ -348,6 +356,7 @@ public class AndroidPlatformSupport extends PlatformSupport {
 		nativeTextInputWatcher = null;
 		nativeTextInputListener = null;
 		nativeTextInputUpdating = false;
+		nativeTextInputGeneration++;
 	}
 
 	/* FONT SUPPORT */
