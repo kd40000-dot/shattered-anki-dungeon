@@ -13,20 +13,24 @@ package com.shatteredpixel.shatteredpixeldungeon.windows;
 import com.shatteredpixel.shatteredpixeldungeon.Chrome;
 import com.shatteredpixel.shatteredpixeldungeon.scenes.PixelScene;
 import com.shatteredpixel.shatteredpixeldungeon.ui.ItemSlot;
-import com.shatteredpixel.shatteredpixeldungeon.ui.StyledButton;
 import com.shatteredpixel.shatteredpixeldungeon.ui.RenderedTextBlock;
+import com.shatteredpixel.shatteredpixeldungeon.ui.StudyAnswerComparison;
+import com.shatteredpixel.shatteredpixeldungeon.ui.StyledButton;
 import com.shatteredpixel.shatteredpixeldungeon.ui.Window;
+import com.watabou.noosa.NinePatch;
 
 /**
- * Shared Anki rating window. It deliberately uses only SPD's existing palette:
- * degraded red, warning orange, upgraded green, and enhanced blue.
+ * Shared Anki rating window using SPD-native chrome and palette.
+ *
+ * The question remains visible after reveal, followed by an Anki-style
+ * per-character typed/answer comparison.
  */
 public abstract class WndStudyRating extends Window {
 
     private boolean resolved;
 
-    private static final int WIDTH_P = 132;
-    private static final int WIDTH_L = 160;
+    private static final int WIDTH_P = 135;
+    private static final int WIDTH_L = 190;
     private static final int MARGIN = 2;
     private static final int BUTTON_HEIGHT = 23;
 
@@ -37,26 +41,66 @@ public abstract class WndStudyRating extends Window {
             ItemSlot.ENHANCED
     };
 
-    public WndStudyRating(String title, int titleColor, String message, String[] options) {
+    public WndStudyRating(
+            String title,
+            int titleColor,
+            String question,
+            String typed,
+            String fullAnswer,
+            boolean neutralBlank,
+            String youLabel,
+            String answerLabel,
+            String[] options
+    ) {
         super();
 
         int width = PixelScene.landscape() ? WIDTH_L : WIDTH_P;
         float pos = MARGIN;
 
         if (title != null) {
-            RenderedTextBlock txtTitle = PixelScene.renderTextBlock(title, 9);
+            RenderedTextBlock txtTitle = PixelScene.renderTextBlock(title, 8);
             txtTitle.hardlight(titleColor);
             txtTitle.maxWidth(width - MARGIN * 2);
-            txtTitle.setPos(MARGIN, pos);
+            txtTitle.setPos((width - txtTitle.width()) / 2f, pos);
             add(txtTitle);
             pos = txtTitle.bottom() + 2 * MARGIN;
         }
 
-        RenderedTextBlock txtMessage = PixelScene.renderTextBlock(6);
-        txtMessage.text(message == null ? "" : message, width);
-        txtMessage.setPos(0, pos);
-        add(txtMessage);
-        pos = txtMessage.bottom() + 2 * MARGIN;
+        if (question != null && !question.trim().isEmpty()) {
+            float panelX = MARGIN;
+            float panelWidth = width - 2f * MARGIN;
+
+            RenderedTextBlock txtQuestion = PixelScene.renderTextBlock(question, 10);
+            txtQuestion.maxWidth((int)panelWidth - 10);
+            txtQuestion.align(RenderedTextBlock.CENTER_ALIGN);
+
+            float panelHeight = Math.max(32, txtQuestion.height() + 10);
+            NinePatch questionFrame = Chrome.get(Chrome.Type.TOAST);
+            questionFrame.x = panelX;
+            questionFrame.y = pos;
+            questionFrame.size(panelWidth, panelHeight);
+            add(questionFrame);
+
+            txtQuestion.setPos(
+                    (width - txtQuestion.width()) / 2f,
+                    pos + (panelHeight - txtQuestion.height()) / 2f
+            );
+            add(txtQuestion);
+
+            pos += panelHeight + 3 * MARGIN;
+        }
+
+        StudyAnswerComparison comparison = new StudyAnswerComparison(
+                width - 2f * MARGIN,
+                typed,
+                fullAnswer,
+                neutralBlank,
+                youLabel,
+                answerLabel
+        );
+        comparison.setPos(MARGIN, pos);
+        add(comparison);
+        pos = comparison.bottom() + 3 * MARGIN;
 
         int count = Math.min(options == null ? 0 : options.length, 4);
         for (int i = 0; i < count; i++) {
