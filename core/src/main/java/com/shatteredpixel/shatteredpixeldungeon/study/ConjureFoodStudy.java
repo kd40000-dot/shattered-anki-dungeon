@@ -127,23 +127,24 @@ public final class ConjureFoodStudy {
         int completed = StudyRunState.reviewsTowardNext();
         int required = StudyRunState.reviewsRequired();
 
-        String prompt = Messages.get(
+        String progress = Messages.get(
                 ConjureFoodStudy.class,
-                "prompt",
+                "progress",
                 completed,
-                required,
-                card.question
+                required
         );
 
         ShatteredPixelDungeon.scene().addToFront(new WndTextInput(
                 Messages.get(ConjureFoodStudy.class, "title"),
-                prompt,
+                card.question,
                 "",
                 512,
                 false,
                 Messages.get(ConjureFoodStudy.class, "check"),
                 Messages.get(ConjureFoodStudy.class, "stop"),
-                true
+                true,
+                true,
+                progress
         ) {
             @Override
             public void onSelect(boolean positive, String text) {
@@ -174,14 +175,6 @@ public final class ConjureFoodStudy {
         String matched = TypedAnswerMatcher.matchedAlternative(typed, card.answer);
         boolean correct = matched != null;
 
-        String shownTyped = typed.trim().isEmpty()
-                ? Messages.get(ConjureFoodStudy.class, "blank_answer")
-                : typed.trim();
-
-        String result = correct
-                ? Messages.get(ConjureFoodStudy.class, "result_correct", shownTyped, matched)
-                : Messages.get(ConjureFoodStudy.class, "result_incorrect", shownTyped, card.answer);
-
         int count = Math.max(1, Math.min(4, card.buttonCount));
         String[] options = new String[count];
 
@@ -198,7 +191,12 @@ public final class ConjureFoodStudy {
                         ? Messages.get(ConjureFoodStudy.class, "correct")
                         : Messages.get(ConjureFoodStudy.class, "incorrect"),
                 correct ? ItemSlot.UPGRADED : ItemSlot.DEGRADED,
-                result,
+                card.question,
+                typed,
+                card.answer,
+                false,
+                Messages.get(ConjureFoodStudy.class, "you"),
+                Messages.get(ConjureFoodStudy.class, "answer_label"),
                 options
         ) {
             @Override
