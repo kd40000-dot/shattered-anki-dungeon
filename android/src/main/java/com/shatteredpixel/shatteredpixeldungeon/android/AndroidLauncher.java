@@ -42,6 +42,7 @@ import com.badlogic.gdx.graphics.g2d.freetype.FreeType;
 import com.badlogic.gdx.utils.GdxNativesLoader;
 import com.shatteredpixel.shatteredpixeldungeon.SPDSettings;
 import com.shatteredpixel.shatteredpixeldungeon.android.study.AndroidAnkiStudyService;
+import com.shatteredpixel.shatteredpixeldungeon.android.study.StudyCrashReporter;
 import com.shatteredpixel.shatteredpixeldungeon.study.Study;
 import com.shatteredpixel.shatteredpixeldungeon.ShatteredPixelDungeon;
 import com.shatteredpixel.shatteredpixeldungeon.services.news.News;
@@ -63,6 +64,7 @@ public class AndroidLauncher extends AndroidApplication {
 	@Override
 	protected void onCreate (Bundle savedInstanceState) {
 		super.onCreate(savedInstanceState);
+		StudyCrashReporter.install(this);
 
 		try {
 			GdxNativesLoader.load();
@@ -188,6 +190,7 @@ public class AndroidLauncher extends AndroidApplication {
 			finishAndRemoveTask();
 		}
 		super.onResume();
+		StudyCrashReporter.showPending(this);
 
 		if (Study.service instanceof AndroidAnkiStudyService) {
 			((AndroidAnkiStudyService) Study.service).onHostResume();

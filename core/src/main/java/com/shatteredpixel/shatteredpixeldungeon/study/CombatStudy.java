@@ -54,6 +54,10 @@ public final class CombatStudy {
      * @return true when this attack was intercepted by the study layer.
      */
     public static boolean interceptAttack(Hero hero, Char target) {
+        StudyDiagnostics.mark("combat intercept ready=" + (hero != null && hero.ready)
+                + " pendingRetry=" + (pendingRetryCard != null)
+                + " guard=" + StudySessionGuard.owner()
+                + " target=" + (target == null ? "null" : target.getClass().getSimpleName() + "@" + target.pos));
         if (!StudyRunState.combatEnabled()) {
             return false;
         }
@@ -110,6 +114,8 @@ public final class CombatStudy {
         pendingTarget = target;
 
         if (pendingRetryCard != null) {
+            StudyDiagnostics.mark("combat restoring retry card note=" + pendingRetryCard.noteId
+                    + " ord=" + pendingRetryCard.ord + " token=" + token);
             card = pendingRetryCard;
             pendingRetryCard = null;
             currentAttemptIsRetry = true;
@@ -135,6 +141,7 @@ public final class CombatStudy {
         }
 
         loading = true;
+        StudyDiagnostics.mark("combat loadNextCard token=" + token);
         Study.service.loadNextCard(new StudyService.CardCallback() {
             @Override
             public void onCardLoaded(StudyCard loaded) {
@@ -145,6 +152,8 @@ public final class CombatStudy {
                     return;
                 }
                 card = loaded;
+                StudyDiagnostics.mark("combat card loaded note=" + loaded.noteId + " ord=" + loaded.ord
+                        + " reps=" + loaded.reps + " token=" + token);
                 showQuestion(token);
             }
 
@@ -173,6 +182,8 @@ public final class CombatStudy {
         result = null;
         attemptStartedAt = Game.realTime;
         final StudyCard shownCard = card;
+        StudyDiagnostics.mark("combat showQuestion retry=" + currentAttemptIsRetry
+                + " note=" + shownCard.noteId + " token=" + token);
 
         ShatteredPixelDungeon.scene().addToFront(new WndTextInput(
                 Messages.get(CombatStudy.class, "title"),
@@ -212,6 +223,10 @@ public final class CombatStudy {
 
         String trimmed = typed.trim();
         String matched = TypedAnswerMatcher.matchedAlternative(trimmed, shownCard.answer);
+
+        StudyDiagnostics.mark("combat reveal typedLen=" + trimmed.length()
+                + " retry=" + currentAttemptIsRetry + " note=" + shownCard.noteId
+                + " token=" + token);
 
         if (trimmed.isEmpty() && shownCard.reps == 0 && !currentAttemptIsRetry) {
             result = Result.NEW_BLANK;
@@ -279,6 +294,8 @@ public final class CombatStudy {
         }
 
         if (result == Result.WRONG && pressedEase == 1) {
+            StudyDiagnostics.mark("combat wrong->Again note=" + shownCard.noteId
+                    + " token=" + token + " heroReady=" + pendingHero.ready);
             Hero hero = pendingHero;
 
             // Preserve only immutable card data. The current study session,
@@ -286,6 +303,8 @@ public final class CombatStudy {
             // skipped combat turn is released to SPD.
             pendingRetryCard = copyCard(shownCard);
             finishSession(token, true);
+            StudyDiagnostics.mark("combat Again session finished; retry detached="
+                    + (pendingRetryCard != null));
 
             if (hero != null) {
                 hero.studyAttackFailed();
@@ -294,6 +313,9 @@ public final class CombatStudy {
         }
 
         submitting = true;
+        StudyDiagnostics.mark("combat submit ease=" + pressedEase
+                + " retry=" + currentAttemptIsRetry + " result=" + result
+                + " note=" + shownCard.noteId + " token=" + token);
 
         final int effectiveEase =
                 result == Result.CORRECT && currentAttemptIsRetry ? 1 : pressedEase;
@@ -308,6 +330,8 @@ public final class CombatStudy {
                 if (!isCurrent(token) || card != shownCard) return;
 
                 submitting = false;
+                StudyDiagnostics.mark("combat answer saved note=" + shownCard.noteId
+                        + " shouldAttack=" + shouldAttack + " token=" + token);
                 finishSession(token, false);
 
                 if (hero == null) return;
@@ -360,6 +384,8 @@ public final class CombatStudy {
 
     private static void finishSession(long token, boolean preserveRetryCard) {
         if (!isCurrent(token)) return;
+        StudyDiagnostics.mark("combat finishSession token=" + token
+                + " preserveRetry=" + preserveRetryCard);
         StudySessionGuard.finish(OWNER, token);
         clearSessionState(true);
         if (!preserveRetryCard) {
