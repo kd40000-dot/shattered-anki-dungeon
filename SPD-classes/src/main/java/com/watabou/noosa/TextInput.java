@@ -44,6 +44,7 @@ import com.watabou.noosa.ui.Component;
 import com.watabou.utils.DeviceCompat;
 import com.watabou.utils.FileUtils;
 import com.watabou.utils.Point;
+import com.watabou.utils.PlatformSupport;
 
 //essentially contains a libGDX text input field, plus a PD-rendered background
 public class TextInput extends Component {
@@ -56,9 +57,17 @@ public class TextInput extends Component {
 
 	private NinePatch bg;
 
+	private final boolean nativeImeProxy;
+	private boolean syncingFromNative;
+
 	public TextInput( NinePatch bg, boolean multiline, int size ){
+		this(bg, multiline, size, false);
+	}
+
+	public TextInput( NinePatch bg, boolean multiline, int size, boolean nativeImeProxy ){
 		super();
 		this.bg = bg;
+		this.nativeImeProxy = nativeImeProxy && Game.platform.supportsNativeTextInputProxy();
 		add(bg);
 
 		//use a custom viewport here to ensure stage camera matches game camera
@@ -141,13 +150,35 @@ public class TextInput extends Component {
 		textField.setOnscreenKeyboard(new TextField.OnscreenKeyboard() {
 			@Override
 			public void show(boolean visible) {
-				Game.platform.setOnscreenKeyboardVisible(visible, multiline);
+				if (TextInput.this.nativeImeProxy) {
+					Game.platform.setNativeTextInputProxyVisible(visible, multiline);
+				} else {
+					Game.platform.setOnscreenKeyboardVisible(visible, multiline);
+				}
 			}
 		});
 
 		container.setActor(textField);
 		stage.setKeyboardFocus(textField);
-		Game.platform.setOnscreenKeyboardVisible(true, multiline);
+
+		if (this.nativeImeProxy) {
+			Game.platform.startNativeTextInputProxy("", multiline, new PlatformSupport.NativeTextInputListener() {
+				@Override
+				public void onTextChanged(String text) {
+					syncingFromNative = true;
+					textField.setText(text == null ? "" : text);
+					textField.setCursorPosition(textField.getText().length());
+					syncingFromNative = false;
+				}
+
+				@Override
+				public void onEnterPressed() {
+					enterPressed();
+				}
+			});
+		} else {
+			Game.platform.setOnscreenKeyboardVisible(true, multiline);
+		}
 	}
 
 	public void enterPressed(){
@@ -165,10 +196,16 @@ public class TextInput extends Component {
 	public void setText(String text){
 		textField.setText(text);
 		textField.setCursorPosition(textField.getText().length());
+		if (nativeImeProxy && !syncingFromNative) {
+			Game.platform.updateNativeTextInputProxy(textField.getText());
+		}
 	}
 
 	public void setMaxLength(int maxLength){
 		textField.setMaxLength(maxLength);
+		if (nativeImeProxy) {
+			Game.platform.setNativeTextInputProxyMaxLength(maxLength);
+		}
 	}
 
 	public String getText(){
@@ -198,6 +235,9 @@ public class TextInput extends Component {
 
 		textField.setText(existing.substring(0, cursorIdx) + contents + existing.substring(cursorIdx));
 		textField.setCursorPosition(cursorIdx + contents.length());
+		if (nativeImeProxy) {
+			Game.platform.updateNativeTextInputProxy(textField.getText());
+		}
 	}
 
 	@Override
@@ -258,7 +298,11 @@ public class TextInput extends Component {
 			stage.dispose();
 			skin.dispose();
 			Game.inputHandler.removeInputProcessor(stage);
-			Game.platform.setOnscreenKeyboardVisible(false, false);
+			if (nativeImeProxy) {
+				Game.platform.stopNativeTextInputProxy();
+			} else {
+				Game.platform.setOnscreenKeyboardVisible(false, false);
+			}
 			if (!DeviceCompat.isDesktop()) Game.platform.updateSystemUI();
 		}
 	}

@@ -19,6 +19,7 @@ import com.shatteredpixel.shatteredpixeldungeon.utils.GLog;
 import com.shatteredpixel.shatteredpixeldungeon.windows.WndMessage;
 import com.shatteredpixel.shatteredpixeldungeon.ui.ItemSlot;
 import com.shatteredpixel.shatteredpixeldungeon.windows.WndStudyRating;
+import com.shatteredpixel.shatteredpixeldungeon.windows.WndTextInput;
 import com.watabou.noosa.Game;
 
 /**
@@ -101,24 +102,32 @@ public final class ConjureFoodStudy {
                 card.question
         );
 
-        Study.service.requestTypedAnswer(
+        ShatteredPixelDungeon.scene().addToFront(new WndTextInput(
                 Messages.get(ConjureFoodStudy.class, "title"),
                 prompt,
+                "",
+                512,
+                false,
                 Messages.get(ConjureFoodStudy.class, "check"),
                 Messages.get(ConjureFoodStudy.class, "stop"),
-                new StudyService.TextInputCallback() {
-                    @Override
-                    public void onSubmitted(String text) {
-                        if (!sessionActive) return;
-                        showRating(card, text == null ? "" : text);
-                    }
-
-                    @Override
-                    public void onCancelled() {
-                        sessionActive = false;
-                    }
+                true
+        ) {
+            @Override
+            public void onSelect(boolean positive, String text) {
+                if (!positive) {
+                    sessionActive = false;
+                    return;
                 }
-        );
+                if (!sessionActive) return;
+                showRating(card, text == null ? "" : text);
+            }
+
+            @Override
+            public void onBackPressed() {
+                sessionActive = false;
+                hide();
+            }
+        });
     }
 
     private static void showRating(final StudyCard card, String typed) {
