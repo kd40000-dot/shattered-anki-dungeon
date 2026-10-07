@@ -23,11 +23,15 @@ public class StudyRatingDots extends Component {
 
     private static final int[] COLORS = {
             0,
-            ItemSlot.DEGRADED,
-            ItemSlot.WARNING,
-            ItemSlot.UPGRADED,
-            ItemSlot.ENHANCED
+            opaque(ItemSlot.DEGRADED),
+            opaque(ItemSlot.WARNING),
+            opaque(ItemSlot.UPGRADED),
+            opaque(ItemSlot.ENHANCED)
     };
+
+    private static int opaque(int rgb) {
+        return 0xFF000000 | rgb;
+    }
 
     private final ColorBlock[] dots;
     private final int ease;
