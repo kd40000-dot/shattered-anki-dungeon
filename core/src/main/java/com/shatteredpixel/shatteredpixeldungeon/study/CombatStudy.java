@@ -39,9 +39,11 @@ public final class CombatStudy {
     private static Hero pendingHero;
     private static Char pendingTarget;
     private static StudyCard card;
+    /** Card intentionally left unresolved by Wrong -> Again. Not tied to any live session. */
+    private static StudyCard pendingRetryCard;
     private static boolean loading;
     private static boolean submitting;
-    private static boolean retryActive;
+    private static boolean currentAttemptIsRetry;
     private static Result result;
     private static long attemptStartedAt;
 
@@ -62,8 +64,9 @@ public final class CombatStudy {
 
         if (Study.service == null || !Study.service.backendAvailable()) {
             if (StudySessionGuard.isCurrent(OWNER, sessionToken)) {
-                finishSession(sessionToken);
+                finishSession(sessionToken, false);
             }
+            pendingRetryCard = null;
             hero.studyAttackCancelled();
             showMessage(Messages.get(CombatStudy.class, "no_backend"));
             return true;
@@ -73,8 +76,9 @@ public final class CombatStudy {
             // No gameplay action or unresolved retry is kept alive across
             // Android's permission UI.
             if (StudySessionGuard.isCurrent(OWNER, sessionToken)) {
-                finishSession(sessionToken);
+                finishSession(sessionToken, false);
             }
+            pendingRetryCard = null;
             hero.studyAttackCancelled();
             Study.service.requestAccess((granted, message) ->
                     showMessage(message == null ? "" : message));
@@ -82,16 +86,9 @@ public final class CombatStudy {
         }
 
         if (StudySessionGuard.isCurrent(OWNER, sessionToken)) {
-            // A wrong+Again intentionally holds the card for the next attack.
-            if (retryActive && card != null && pendingHero == null && !loading && !submitting) {
-                pendingHero = hero;
-                pendingTarget = target;
-                showQuestion(sessionToken);
-            } else {
-                // Any other re-entry is stale/duplicate input. Cancel it rather
-                // than replacing the action currently owned by the session.
-                hero.studyAttackCancelled();
-            }
+            // A live combat review never survives across turns anymore. Any
+            // re-entry while it is live is duplicate input and is cancelled.
+            hero.studyAttackCancelled();
             return true;
         }
 
@@ -107,11 +104,20 @@ public final class CombatStudy {
             return true;
         }
 
-        clearLocalState(false);
+        clearSessionState(false);
         sessionToken = token;
         pendingHero = hero;
         pendingTarget = target;
-        loadNextCard(token);
+
+        if (pendingRetryCard != null) {
+            card = pendingRetryCard;
+            pendingRetryCard = null;
+            currentAttemptIsRetry = true;
+            showQuestion(token);
+        } else {
+            currentAttemptIsRetry = false;
+            loadNextCard(token);
+        }
         return true;
     }
 
@@ -119,7 +125,8 @@ public final class CombatStudy {
         if (StudySessionGuard.isCurrent(OWNER, sessionToken)) {
             StudySessionGuard.finish(OWNER, sessionToken);
         }
-        clearLocalState(true);
+        clearSessionState(true);
+        pendingRetryCard = null;
     }
 
     private static void loadNextCard(final long token) {
@@ -206,7 +213,7 @@ public final class CombatStudy {
         String trimmed = typed.trim();
         String matched = TypedAnswerMatcher.matchedAlternative(trimmed, shownCard.answer);
 
-        if (trimmed.isEmpty() && shownCard.reps == 0 && !retryActive) {
+        if (trimmed.isEmpty() && shownCard.reps == 0 && !currentAttemptIsRetry) {
             result = Result.NEW_BLANK;
         } else if (matched != null) {
             result = Result.CORRECT;
@@ -272,15 +279,14 @@ public final class CombatStudy {
         }
 
         if (result == Result.WRONG && pressedEase == 1) {
-            retryActive = true;
-            result = null;
-
             Hero hero = pendingHero;
-            pendingHero = null;
-            pendingTarget = null;
 
-            // The session and unresolved card intentionally remain owned by
-            // combat so the next attack retries this exact card.
+            // Preserve only immutable card data. The current study session,
+            // token, windows, and IME ownership are fully ended before the
+            // skipped combat turn is released to SPD.
+            pendingRetryCard = copyCard(shownCard);
+            finishSession(token, true);
+
             if (hero != null) {
                 hero.studyAttackFailed();
             }
@@ -290,7 +296,7 @@ public final class CombatStudy {
         submitting = true;
 
         final int effectiveEase =
-                result == Result.CORRECT && retryActive ? 1 : pressedEase;
+                result == Result.CORRECT && currentAttemptIsRetry ? 1 : pressedEase;
         final boolean shouldAttack = result == Result.CORRECT;
         final Hero hero = pendingHero;
         final Char target = pendingTarget;
@@ -302,7 +308,7 @@ public final class CombatStudy {
                 if (!isCurrent(token) || card != shownCard) return;
 
                 submitting = false;
-                finishSession(token);
+                finishSession(token, false);
 
                 if (hero == null) return;
                 if (shouldAttack) {
@@ -326,7 +332,7 @@ public final class CombatStudy {
 
         Hero hero = pendingHero;
         Char target = pendingTarget;
-        finishSession(token);
+        finishSession(token, false);
 
         if (hero != null) {
             hero.studyAttackApproved(target);
@@ -336,7 +342,7 @@ public final class CombatStudy {
     private static void failSession(long token, String message) {
         if (!isCurrent(token)) return;
         Hero hero = pendingHero;
-        finishSession(token);
+        finishSession(token, false);
         if (hero != null) {
             hero.studyAttackCancelled();
         }
@@ -346,34 +352,54 @@ public final class CombatStudy {
     private static void cancelSession(long token) {
         if (!isCurrent(token)) return;
         Hero hero = pendingHero;
-        finishSession(token);
+        finishSession(token, false);
         if (hero != null) {
             hero.studyAttackCancelled();
         }
     }
 
-    private static void finishSession(long token) {
+    private static void finishSession(long token, boolean preserveRetryCard) {
         if (!isCurrent(token)) return;
         StudySessionGuard.finish(OWNER, token);
-        clearLocalState(true);
+        clearSessionState(true);
+        if (!preserveRetryCard) {
+            pendingRetryCard = null;
+        }
     }
 
     private static boolean isCurrent(long token) {
         return StudySessionGuard.isCurrent(OWNER, token) && sessionToken == token;
     }
 
-    private static void clearLocalState(boolean clearToken) {
+    private static void clearSessionState(boolean clearToken) {
         pendingHero = null;
         pendingTarget = null;
         card = null;
         loading = false;
         submitting = false;
-        retryActive = false;
+        currentAttemptIsRetry = false;
         result = null;
         attemptStartedAt = 0L;
         if (clearToken) {
             sessionToken = 0L;
         }
+    }
+
+    public static boolean hasPendingRetry() {
+        return pendingRetryCard != null;
+    }
+
+    private static StudyCard copyCard(StudyCard source) {
+        return new StudyCard(
+                source.noteId,
+                source.ord,
+                source.reps,
+                source.buttonCount,
+                source.question,
+                source.answer,
+                source.nextReviewTimes.clone(),
+                source.mediaFiles.clone()
+        );
     }
 
     private static void showMessage(String message) {
