@@ -345,6 +345,7 @@ public final class CombatStudy {
                 if (!isCurrent(token) || card != shownCard) return;
 
                 submitting = false;
+                StudyPreviousRating.record(effectiveEase);
                 StudyDiagnostics.mark("combat answer saved note=" + shownCard.noteId
                         + " shouldAttack=" + shouldAttack + " token=" + token);
                 finishSession(token, false);
