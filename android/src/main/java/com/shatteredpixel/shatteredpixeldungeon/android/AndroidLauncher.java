@@ -64,7 +64,6 @@ public class AndroidLauncher extends AndroidApplication {
 	@Override
 	protected void onCreate (Bundle savedInstanceState) {
 		super.onCreate(savedInstanceState);
-		StudyCrashReporter.install(this);
 
 		try {
 			GdxNativesLoader.load();
@@ -136,6 +135,14 @@ public class AndroidLauncher extends AndroidApplication {
 			instance = this;
 		}
 
+		if (SPDSettings.studyCrashDiagnostics()) {
+			StudyCrashReporter.install(this);
+		} else {
+			// The diagnostic build used while fixing the Again crash stored its
+			// report persistently. Clear that stale report in normal builds.
+			StudyCrashReporter.clearPending(this);
+		}
+
 		//Core gameplay talks only to StudyService; Android supplies AnkiDroid access.
 		Study.service = new AndroidAnkiStudyService(this);
 
@@ -190,7 +197,9 @@ public class AndroidLauncher extends AndroidApplication {
 			finishAndRemoveTask();
 		}
 		super.onResume();
-		StudyCrashReporter.showPending(this);
+		if (SPDSettings.studyCrashDiagnostics()) {
+			StudyCrashReporter.showPending(this);
+		}
 
 		if (Study.service instanceof AndroidAnkiStudyService) {
 			((AndroidAnkiStudyService) Study.service).onHostResume();
