@@ -66,8 +66,8 @@ public abstract class WndStudyRating extends Window {
                 protected void onClick() {
                     if (resolved) return;
                     resolved = true;
-                    onSelect(index);
                     hide();
+                    onSelect(index);
                 }
             };
             button.multiline = true;
