@@ -65,6 +65,11 @@ public final class ConjureFoodStudy {
             return;
         }
 
+        if (CombatStudy.hasPendingRetry()) {
+            showMessage(Messages.get(ConjureFoodStudy.class, "combat_retry_pending"));
+            return;
+        }
+
         if (StudySessionGuard.busy()) {
             showMessage(Messages.get(ConjureFoodStudy.class, "busy"));
             return;
