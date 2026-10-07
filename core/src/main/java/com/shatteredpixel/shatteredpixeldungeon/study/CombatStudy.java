@@ -64,7 +64,7 @@ public final class CombatStudy {
 
         if (Study.service == null || !Study.service.backendAvailable()) {
             if (StudySessionGuard.isCurrent(OWNER, sessionToken)) {
-                finishSession(sessionToken, false)
+                finishSession(sessionToken, false);
             }
             hero.studyAttackCancelled();
             showMessage(Messages.get(CombatStudy.class, "no_backend"));
@@ -75,7 +75,7 @@ public final class CombatStudy {
             // No gameplay action or unresolved retry is kept alive across
             // Android's permission UI.
             if (StudySessionGuard.isCurrent(OWNER, sessionToken)) {
-                finishSession(sessionToken, false)
+                finishSession(sessionToken, false);
             }
             hero.studyAttackCancelled();
             Study.service.requestAccess((granted, message) ->
