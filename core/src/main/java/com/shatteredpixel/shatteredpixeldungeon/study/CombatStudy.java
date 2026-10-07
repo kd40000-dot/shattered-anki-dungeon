@@ -253,6 +253,19 @@ public final class CombatStudy {
             result = Result.WRONG;
         }
 
+        String title;
+        int titleColor;
+        if (result == Result.CORRECT) {
+            title = Messages.get(CombatStudy.class, "correct");
+            titleColor = ItemSlot.UPGRADED;
+        } else if (result == Result.NEW_BLANK) {
+            title = Messages.get(CombatStudy.class, "revealed");
+            titleColor = ItemSlot.ENHANCED;
+        } else {
+            title = Messages.get(CombatStudy.class, "incorrect");
+            titleColor = ItemSlot.DEGRADED;
+        }
+
         int count = Math.max(1, Math.min(4, shownCard.buttonCount));
         String[] options = new String[count];
         for (int i = 0; i < count; i++) {
