@@ -25,11 +25,13 @@ import com.badlogic.gdx.Gdx;
 import com.shatteredpixel.shatteredpixeldungeon.Chrome;
 import com.shatteredpixel.shatteredpixeldungeon.scenes.PixelScene;
 import com.shatteredpixel.shatteredpixeldungeon.ui.Icons;
+import com.shatteredpixel.shatteredpixeldungeon.ui.ItemSlot;
 import com.shatteredpixel.shatteredpixeldungeon.ui.RedButton;
 import com.shatteredpixel.shatteredpixeldungeon.ui.RenderedTextBlock;
 import com.shatteredpixel.shatteredpixeldungeon.ui.Window;
 import com.watabou.input.PointerEvent;
 import com.watabou.noosa.Game;
+import com.watabou.noosa.NinePatch;
 import com.watabou.noosa.TextInput;
 import com.watabou.utils.DeviceCompat;
 
@@ -55,6 +57,12 @@ public class WndTextInput extends Window {
 	public WndTextInput(final String title, final String body, final String initialValue, final int maxLength,
 	                           final boolean multiLine, final String posTxt, final String negTxt,
 	                           final boolean nativeImeProxy) {
+		this(title, body, initialValue, maxLength, multiLine, posTxt, negTxt, nativeImeProxy, false, null);
+	}
+
+	public WndTextInput(final String title, final String body, final String initialValue, final int maxLength,
+	                           final boolean multiLine, final String posTxt, final String negTxt,
+	                           final boolean nativeImeProxy, final boolean studyStyle, final String studyMeta) {
 		super();
 
 		final int width;
@@ -76,13 +84,46 @@ public class WndTextInput extends Window {
 			pos = txtTitle.bottom() + 4 * MARGIN;
 		}
 
-		if (body != null) {
-			final RenderedTextBlock txtBody = PixelScene.renderTextBlock(body, 6);
-			txtBody.maxWidth(width);
-			txtBody.setPos(0, pos);
-			add(txtBody);
+		if (studyStyle && studyMeta != null && !studyMeta.trim().isEmpty()) {
+			final RenderedTextBlock txtMeta = PixelScene.renderTextBlock(studyMeta, 6);
+			txtMeta.maxWidth(width - 2 * MARGIN);
+			txtMeta.hardlight(ItemSlot.FADED);
+			txtMeta.setPos((width - txtMeta.width()) / 2f, pos);
+			add(txtMeta);
+			pos = txtMeta.bottom() + 2 * MARGIN;
+		}
 
-			pos = txtBody.bottom() + 2 * MARGIN;
+		if (body != null) {
+			if (studyStyle) {
+				final float panelX = MARGIN;
+				final float panelWidth = width - 2f * MARGIN;
+
+				final RenderedTextBlock txtBody = PixelScene.renderTextBlock(body, 10);
+				txtBody.maxWidth((int)panelWidth - 10);
+				txtBody.align(RenderedTextBlock.CENTER_ALIGN);
+
+				final float panelHeight = Math.max(34, txtBody.height() + 12);
+				final NinePatch questionFrame = Chrome.get(Chrome.Type.TOAST);
+				questionFrame.x = panelX;
+				questionFrame.y = pos;
+				questionFrame.size(panelWidth, panelHeight);
+				add(questionFrame);
+
+				txtBody.setPos(
+						(width - txtBody.width()) / 2f,
+						pos + (panelHeight - txtBody.height()) / 2f
+				);
+				add(txtBody);
+
+				pos += panelHeight + 3 * MARGIN;
+			} else {
+				final RenderedTextBlock txtBody = PixelScene.renderTextBlock(body, 6);
+				txtBody.maxWidth(width);
+				txtBody.setPos(0, pos);
+				add(txtBody);
+
+				pos = txtBody.bottom() + 2 * MARGIN;
+			}
 		}
 
 		int textSize = (int)PixelScene.uiCamera.zoom * (multiLine ? 6 : 9);
