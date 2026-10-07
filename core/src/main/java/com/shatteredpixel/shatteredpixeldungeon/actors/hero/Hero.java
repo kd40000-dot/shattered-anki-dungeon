@@ -29,6 +29,7 @@ import com.shatteredpixel.shatteredpixeldungeon.GamesInProgress;
 import com.shatteredpixel.shatteredpixeldungeon.SPDSettings;
 import com.shatteredpixel.shatteredpixeldungeon.ShatteredPixelDungeon;
 import com.shatteredpixel.shatteredpixeldungeon.Statistics;
+import com.shatteredpixel.shatteredpixeldungeon.study.CombatStudy;
 import com.shatteredpixel.shatteredpixeldungeon.actors.Actor;
 import com.shatteredpixel.shatteredpixeldungeon.actors.Char;
 import com.shatteredpixel.shatteredpixeldungeon.actors.blobs.Blob;
@@ -226,6 +227,7 @@ public class Hero extends Char {
 
 	//reference to the enemy the hero is currently in the process of attacking
 	private Char attackTarget;
+	private boolean studyAttackBypass;
 	
 	public boolean resting = false;
 	
@@ -1467,6 +1469,10 @@ public class Hero extends Char {
 
 		if (attackTarget.isAlive() && canAttack(attackTarget) && attackTarget.invisible == 0) {
 
+			if (!studyAttackBypass && CombatStudy.interceptAttack(this, attackTarget)) {
+				return false;
+			}
+
 			if (heroClass != HeroClass.DUELIST
 					&& hasTalent(Talent.AGGRESSIVE_BARRIER)
 					&& buff(Talent.AggressiveBarrierCooldown.class) == null
@@ -1500,6 +1506,36 @@ public class Hero extends Char {
 
 	public Char attackTarget(){
 		return attackTarget;
+	}
+
+	/** Resume a normal SPD attack after a combat review is successfully resolved. */
+	public void studyAttackApproved(Char target) {
+		if (target == null || !isAlive()) {
+			studyAttackCancelled();
+			return;
+		}
+
+		studyAttackBypass = true;
+		try {
+			curAction = new HeroAction.Attack(target);
+			actAttack((HeroAction.Attack)curAction);
+		} finally {
+			studyAttackBypass = false;
+		}
+	}
+
+	/** Consume the normal attack turn without dealing damage. */
+	public void studyAttackFailed() {
+		curAction = null;
+		attackTarget = null;
+		spendAndNext(attackDelay());
+	}
+
+	/** Abort the pending attack without spending a turn. */
+	public void studyAttackCancelled() {
+		curAction = null;
+		attackTarget = null;
+		ready();
 	}
 	
 	public void rest( boolean fullRest ) {

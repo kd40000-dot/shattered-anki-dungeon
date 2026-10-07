@@ -11,6 +11,14 @@
 package com.shatteredpixel.shatteredpixeldungeon.android.study;
 
 import android.app.Activity;
+import android.app.AlertDialog;
+import android.content.DialogInterface;
+import android.os.Build;
+import android.text.Html;
+import android.view.Window;
+import android.view.WindowManager;
+import android.view.inputmethod.EditorInfo;
+import android.widget.EditText;
 
 import com.badlogic.gdx.Gdx;
 import com.shatteredpixel.shatteredpixeldungeon.study.StudyCard;
@@ -76,6 +84,83 @@ public final class AndroidAnkiStudyService implements StudyService {
             }
         });
         return false;
+    }
+
+    @Override
+    public void requestTypedAnswer(
+            String title,
+            String prompt,
+            String positiveLabel,
+            String negativeLabel,
+            TextInputCallback callback
+    ) {
+        activity.runOnUiThread(() -> {
+            final boolean[] resolved = {false};
+
+            EditText input = new EditText(activity);
+            input.setSingleLine(true);
+            input.setImeOptions(EditorInfo.IME_ACTION_DONE);
+            input.setSelectAllOnFocus(false);
+
+            CharSequence message;
+            String htmlPrompt = prompt == null ? "" : prompt.replace("\n", "<br>");
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.N) {
+                message = Html.fromHtml(htmlPrompt, Html.FROM_HTML_MODE_LEGACY);
+            } else {
+                //noinspection deprecation
+                message = Html.fromHtml(htmlPrompt);
+            }
+
+            AlertDialog dialog = new AlertDialog.Builder(activity)
+                    .setTitle(title)
+                    .setMessage(message)
+                    .setView(input)
+                    .setPositiveButton(positiveLabel, null)
+                    .setNegativeButton(negativeLabel, (d, which) -> {
+                        if (!resolved[0]) {
+                            resolved[0] = true;
+                            post(callback::onCancelled);
+                        }
+                    })
+                    .create();
+
+            dialog.setCanceledOnTouchOutside(false);
+            dialog.setOnCancelListener(d -> {
+                if (!resolved[0]) {
+                    resolved[0] = true;
+                    post(callback::onCancelled);
+                }
+            });
+
+            dialog.setOnShowListener(d -> {
+                dialog.getButton(DialogInterface.BUTTON_POSITIVE).setOnClickListener(v -> {
+                    if (resolved[0]) return;
+                    resolved[0] = true;
+                    String value = input.getText() == null ? "" : input.getText().toString();
+                    dialog.dismiss();
+                    post(() -> callback.onSubmitted(value));
+                });
+
+                input.setOnEditorActionListener((v, actionId, event) -> {
+                    if (actionId == EditorInfo.IME_ACTION_DONE && !resolved[0]) {
+                        resolved[0] = true;
+                        String value = input.getText() == null ? "" : input.getText().toString();
+                        dialog.dismiss();
+                        post(() -> callback.onSubmitted(value));
+                        return true;
+                    }
+                    return false;
+                });
+
+                input.requestFocus();
+                Window window = dialog.getWindow();
+                if (window != null) {
+                    window.setSoftInputMode(WindowManager.LayoutParams.SOFT_INPUT_STATE_ALWAYS_VISIBLE);
+                }
+            });
+
+            dialog.show();
+        });
     }
 
     @Override

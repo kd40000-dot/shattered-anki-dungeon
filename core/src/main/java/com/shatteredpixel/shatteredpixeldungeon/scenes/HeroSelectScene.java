@@ -652,6 +652,24 @@ public class HeroSelectScene extends PixelScene {
 			add(studyButton);
 			buttons.add(studyButton);
 
+			StyledButton combatStudyButton = new StyledButton(
+					Chrome.Type.BLANK,
+					Messages.get(HeroSelectScene.class, SPDSettings.studyCombat() ? "anki_combat_on" : "anki_combat_off"),
+					6) {
+				@Override
+				protected void onClick() {
+					super.onClick();
+					boolean enabled = !SPDSettings.studyCombat();
+					SPDSettings.studyCombat(enabled);
+					text(Messages.get(HeroSelectScene.class, enabled ? "anki_combat_on" : "anki_combat_off"));
+					icon(Icons.get(enabled ? Icons.CHECKED : Icons.UNCHECKED));
+				}
+			};
+			combatStudyButton.leftJustify = true;
+			combatStudyButton.icon(Icons.get(SPDSettings.studyCombat() ? Icons.CHECKED : Icons.UNCHECKED));
+			add(combatStudyButton);
+			buttons.add(combatStudyButton);
+
 			// Upstream hides advanced game options for a player's first run.
 			// Keep that behavior, but always let them choose classic hunger vs study mode.
 			if (SPDSettings.intro()) {

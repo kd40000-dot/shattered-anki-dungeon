@@ -75,6 +75,7 @@ import com.shatteredpixel.shatteredpixeldungeon.levels.rooms.secret.SecretRoom;
 import com.shatteredpixel.shatteredpixeldungeon.levels.rooms.special.SpecialRoom;
 import com.shatteredpixel.shatteredpixeldungeon.messages.Messages;
 import com.shatteredpixel.shatteredpixeldungeon.scenes.GameScene;
+import com.shatteredpixel.shatteredpixeldungeon.study.CombatStudy;
 import com.shatteredpixel.shatteredpixeldungeon.study.StudyRunState;
 import com.shatteredpixel.shatteredpixeldungeon.ui.QuickSlotButton;
 import com.shatteredpixel.shatteredpixeldungeon.ui.Toolbar;
@@ -255,7 +256,8 @@ public class Dungeon {
 		Random.resetGenerators();
 		
 		Statistics.reset();
-		StudyRunState.reset(SPDSettings.studyConjureFood());
+		StudyRunState.reset(SPDSettings.studyConjureFood(), SPDSettings.studyCombat());
+		CombatStudy.reset();
 		Notes.reset();
 
 		quickslot.reset();
@@ -750,9 +752,11 @@ public class Dungeon {
 		Dungeon.mobsToChampion = bundle.getFloat( MOBS_TO_CHAMPION );
 
 		if (bundle.contains( STUDY_RUN )) {
-			StudyRunState.restoreFromBundle( bundle.getBundle( STUDY_RUN ), SPDSettings.studyConjureFood() );
+			StudyRunState.restoreFromBundle( bundle.getBundle( STUDY_RUN ), SPDSettings.studyConjureFood(), SPDSettings.studyCombat() );
+			CombatStudy.reset();
 		} else {
-			StudyRunState.reset( SPDSettings.studyConjureFood() );
+			StudyRunState.reset( SPDSettings.studyConjureFood(), SPDSettings.studyCombat() );
+			CombatStudy.reset();
 		}
 		
 		Dungeon.level = null;

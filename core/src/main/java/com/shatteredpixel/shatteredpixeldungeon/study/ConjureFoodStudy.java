@@ -11,13 +11,14 @@
 package com.shatteredpixel.shatteredpixeldungeon.study;
 
 import com.shatteredpixel.shatteredpixeldungeon.Dungeon;
+import com.shatteredpixel.shatteredpixeldungeon.GamesInProgress;
 import com.shatteredpixel.shatteredpixeldungeon.ShatteredPixelDungeon;
 import com.shatteredpixel.shatteredpixeldungeon.items.food.ConjuredRation;
 import com.shatteredpixel.shatteredpixeldungeon.messages.Messages;
 import com.shatteredpixel.shatteredpixeldungeon.utils.GLog;
 import com.shatteredpixel.shatteredpixeldungeon.windows.WndMessage;
-import com.shatteredpixel.shatteredpixeldungeon.windows.WndOptions;
-import com.shatteredpixel.shatteredpixeldungeon.windows.WndTextInput;
+import com.shatteredpixel.shatteredpixeldungeon.ui.ItemSlot;
+import com.shatteredpixel.shatteredpixeldungeon.windows.WndStudyRating;
 import com.watabou.noosa.Game;
 
 /**
@@ -92,7 +93,7 @@ public final class ConjureFoodStudy {
         int completed = StudyRunState.reviewsTowardNext();
         int required = StudyRunState.reviewsRequired();
 
-        String body = Messages.get(
+        String prompt = Messages.get(
                 ConjureFoodStudy.class,
                 "prompt",
                 completed,
@@ -100,24 +101,24 @@ public final class ConjureFoodStudy {
                 card.question
         );
 
-        ShatteredPixelDungeon.scene().addToFront(new WndTextInput(
+        Study.service.requestTypedAnswer(
                 Messages.get(ConjureFoodStudy.class, "title"),
-                body,
-                "",
-                512,
-                false,
+                prompt,
                 Messages.get(ConjureFoodStudy.class, "check"),
-                Messages.get(ConjureFoodStudy.class, "stop")
-        ) {
-            @Override
-            public void onSelect(boolean positive, String text) {
-                if (!positive) {
-                    sessionActive = false;
-                    return;
+                Messages.get(ConjureFoodStudy.class, "stop"),
+                new StudyService.TextInputCallback() {
+                    @Override
+                    public void onSubmitted(String text) {
+                        if (!sessionActive) return;
+                        showRating(card, text == null ? "" : text);
+                    }
+
+                    @Override
+                    public void onCancelled() {
+                        sessionActive = false;
+                    }
                 }
-                showRating(card, text == null ? "" : text);
-            }
-        });
+        );
     }
 
     private static void showRating(final StudyCard card, String typed) {
@@ -140,13 +141,14 @@ public final class ConjureFoodStudy {
             String interval = i < card.nextReviewTimes.length ? card.nextReviewTimes[i] : "";
             options[i] = interval == null || interval.trim().isEmpty()
                     ? label
-                    : label + "  ·  " + interval;
+                    : label + "\n" + interval;
         }
 
-        ShatteredPixelDungeon.scene().addToFront(new WndOptions(
+        ShatteredPixelDungeon.scene().addToFront(new WndStudyRating(
                 correct
                         ? Messages.get(ConjureFoodStudy.class, "correct")
                         : Messages.get(ConjureFoodStudy.class, "incorrect"),
+                correct ? ItemSlot.UPGRADED : ItemSlot.DEGRADED,
                 result,
                 options
         ) {
@@ -156,9 +158,8 @@ public final class ConjureFoodStudy {
             }
 
             @Override
-            public void onBackPressed() {
+            protected void onCancelled() {
                 sessionActive = false;
-                super.onBackPressed();
             }
         });
     }
@@ -170,6 +171,10 @@ public final class ConjureFoodStudy {
             @Override
             public void onAnswered() {
                 boolean completedRation = StudyRunState.recordResolvedReview();
+
+                // Persist study progression immediately. SPD can reload the run when
+                // changing scenes/floors, so progression must never depend on a later autosave.
+                Dungeon.saveGame(GamesInProgress.curSlot);
 
                 if (completedRation) {
                     sessionActive = false;
