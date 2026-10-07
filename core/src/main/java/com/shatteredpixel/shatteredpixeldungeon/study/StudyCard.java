@@ -36,9 +36,9 @@ public final class StudyCard {
         this.ord = ord;
         this.reps = reps;
         this.buttonCount = buttonCount;
-        this.question = question == null ? "" : question;
+        this.question = StudyTextSanitizer.question(question);
         this.answer = answer == null ? "" : answer;
-        this.nextReviewTimes = nextReviewTimes == null ? new String[0] : nextReviewTimes;
+        this.nextReviewTimes = StudyTextSanitizer.intervals(nextReviewTimes);
         this.mediaFiles = mediaFiles == null ? new String[0] : mediaFiles;
     }
 }
