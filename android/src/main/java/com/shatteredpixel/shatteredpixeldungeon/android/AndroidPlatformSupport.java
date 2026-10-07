@@ -58,9 +58,9 @@ public class AndroidPlatformSupport extends PlatformSupport {
 
 	private EditText nativeTextInputProxy;
 	private TextWatcher nativeTextInputWatcher;
-	private NativeTextInputListener nativeTextInputListener;
+	private volatile NativeTextInputListener nativeTextInputListener;
 	private boolean nativeTextInputUpdating;
-	private long nativeTextInputGeneration;
+	private volatile long nativeTextInputGeneration;
 
 	
 	public void updateDisplaySize(){
