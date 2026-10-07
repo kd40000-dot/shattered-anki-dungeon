@@ -10,10 +10,10 @@
 
 package com.shatteredpixel.shatteredpixeldungeon.items.food;
 
-import com.shatteredpixel.shatteredpixeldungeon.Dungeon;
 import com.shatteredpixel.shatteredpixeldungeon.actors.hero.Hero;
 import com.shatteredpixel.shatteredpixeldungeon.effects.SpellSprite;
 import com.shatteredpixel.shatteredpixeldungeon.messages.Messages;
+import com.shatteredpixel.shatteredpixeldungeon.scenes.GameScene;
 import com.shatteredpixel.shatteredpixeldungeon.utils.GLog;
 
 /**
@@ -32,6 +32,12 @@ public class ConjuredRation extends Food {
             super.execute(hero, action);
             return;
         }
+
+        // Mirror Item.execute's normal action setup. We intentionally bypass
+        // Food.execute below so normal meal talents/statistics are not triggered.
+        GameScene.cancel();
+        curUser = hero;
+        curItem = this;
 
         detach(hero.belongings.backpack);
 
