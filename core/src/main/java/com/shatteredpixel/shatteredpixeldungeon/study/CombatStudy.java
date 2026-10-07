@@ -66,6 +66,7 @@ public final class CombatStudy {
             if (StudySessionGuard.isCurrent(OWNER, sessionToken)) {
                 finishSession(sessionToken, false);
             }
+            pendingRetryCard = null;
             hero.studyAttackCancelled();
             showMessage(Messages.get(CombatStudy.class, "no_backend"));
             return true;
@@ -77,6 +78,7 @@ public final class CombatStudy {
             if (StudySessionGuard.isCurrent(OWNER, sessionToken)) {
                 finishSession(sessionToken, false);
             }
+            pendingRetryCard = null;
             hero.studyAttackCancelled();
             Study.service.requestAccess((granted, message) ->
                     showMessage(message == null ? "" : message));
@@ -282,7 +284,7 @@ public final class CombatStudy {
             // Preserve only immutable card data. The current study session,
             // token, windows, and IME ownership are fully ended before the
             // skipped combat turn is released to SPD.
-            pendingRetryCard = shownCard;
+            pendingRetryCard = copyCard(shownCard);
             finishSession(token, true);
 
             if (hero != null) {
@@ -383,8 +385,21 @@ public final class CombatStudy {
         }
     }
 
-    static boolean hasPendingRetryForTest() {
+    public static boolean hasPendingRetry() {
         return pendingRetryCard != null;
+    }
+
+    private static StudyCard copyCard(StudyCard source) {
+        return new StudyCard(
+                source.noteId,
+                source.ord,
+                source.reps,
+                source.buttonCount,
+                source.question,
+                source.answer,
+                source.nextReviewTimes.clone(),
+                source.mediaFiles.clone()
+        );
     }
 
     private static void showMessage(String message) {
