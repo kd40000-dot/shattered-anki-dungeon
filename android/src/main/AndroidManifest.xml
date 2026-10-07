@@ -10,8 +10,19 @@
 	<uses-permission android:name="android.permission.INTERNET" />
 	<uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" />
 
+	<!-- AnkiDroid public CardContentProvider access. Both are declared so one
+	     game APK works with stock AnkiDroid or the custom Retry build. -->
+	<uses-permission android:name="com.ichi2.anki.permission.READ_WRITE_DATABASE" />
+	<uses-permission android:name="com.ichi2.anki.retry.permission.READ_WRITE_DATABASE" />
+
 	<!--Auto-generated permission that isn't needed-->
 	<uses-permission android:name="${applicationId}.DYNAMIC_RECEIVER_NOT_EXPORTED_PERMISSION" tools:node="remove" />
+
+	<!-- Android 11+ package visibility for both supported AnkiDroid providers. -->
+	<queries>
+		<provider android:authorities="com.ichi2.anki.flashcards" />
+		<provider android:authorities="com.ichi2.anki.retry.flashcards" />
+	</queries>
 
 	<!-- Hilariously small screens still exist but are usually high enough DPI to work now -->
 	<supports-screens
