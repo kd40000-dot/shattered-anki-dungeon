@@ -85,6 +85,41 @@ public abstract class PlatformSupport {
 		Gdx.input.setOnscreenKeyboardVisible(value, Input.OnscreenKeyboardType.Default);
 	}
 
+	/**
+	 * Optional native IME proxy used by selected libGDX TextInput instances.
+	 * Android overrides these methods with a hidden EditText so composing IMEs
+	 * (for example Vietnamese Telex) can work while the game keeps rendering
+	 * its normal Pixel Dungeon text box.
+	 */
+	public interface NativeTextInputListener {
+		void onTextChanged(String text);
+		void onEnterPressed();
+	}
+
+	public boolean supportsNativeTextInputProxy(){
+		return false;
+	}
+
+	public void startNativeTextInputProxy(String initialText, boolean multiline, NativeTextInputListener listener){
+		//unsupported by default
+	}
+
+	public void updateNativeTextInputProxy(String text){
+		//unsupported by default
+	}
+
+	public void setNativeTextInputProxyMaxLength(int maxLength){
+		//unsupported by default
+	}
+
+	public void setNativeTextInputProxyVisible(boolean visible, boolean multiline){
+		//unsupported by default
+	}
+
+	public void stopNativeTextInputProxy(){
+		//unsupported by default
+	}
+
 	//TODO should consider spinning this into its own class, rather than platform support getting ever bigger
 	protected static HashMap<FreeTypeFontGenerator, HashMap<Integer, BitmapFont>> fonts;
 
