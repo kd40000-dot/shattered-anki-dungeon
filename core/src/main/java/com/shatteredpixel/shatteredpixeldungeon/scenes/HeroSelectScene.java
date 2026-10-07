@@ -795,6 +795,24 @@ public class HeroSelectScene extends PixelScene {
 			add(dailyButton);
 			buttons.add(dailyButton);
 
+			StyledButton studyButton = new StyledButton(
+					Chrome.Type.BLANK,
+					Messages.get(HeroSelectScene.class, SPDSettings.studyConjureFood() ? "conjure_food_on" : "conjure_food_off"),
+					6) {
+				@Override
+				protected void onClick() {
+					super.onClick();
+					boolean enabled = !SPDSettings.studyConjureFood();
+					SPDSettings.studyConjureFood(enabled);
+					text(Messages.get(HeroSelectScene.class, enabled ? "conjure_food_on" : "conjure_food_off"));
+					icon(Icons.get(enabled ? Icons.CHECKED : Icons.UNCHECKED));
+				}
+			};
+			studyButton.leftJustify = true;
+			studyButton.icon(Icons.get(SPDSettings.studyConjureFood() ? Icons.CHECKED : Icons.UNCHECKED));
+			add(studyButton);
+			buttons.add(studyButton);
+
 			challengeButton = new StyledButton(Chrome.Type.BLANK, Messages.get(WndChallenges.class, "title"), 6){
 				@Override
 				protected void onClick() {
