@@ -1,0 +1,72 @@
+name: Bootstrap SPD upstream
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [main]
+    paths:
+      - bootstrap/import-upstream.txt
+
+permissions:
+  contents: write
+  pull-requests: write
+
+env:
+  UPSTREAM_REPO: https://github.com/00-Evan/shattered-pixel-dungeon.git
+  UPSTREAM_SHA: e9defd0444c96d2fce3de5ec297c3398be8b7c55
+  BOOTSTRAP_BRANCH: bootstrap/spd-v4.0.1
+
+jobs:
+  bootstrap:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Configure git
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+
+      - name: Fetch pinned SPD upstream
+        run: |
+          git remote remove spd-upstream 2>/dev/null || true
+          git remote add spd-upstream "$UPSTREAM_REPO"
+          git fetch --no-tags spd-upstream "$UPSTREAM_SHA"
+
+      - name: Build bootstrap merge
+        run: |
+          git switch -C "$BOOTSTRAP_BRANCH" "$GITHUB_SHA"
+          git merge --allow-unrelated-histories --no-commit "$UPSTREAM_SHA" || true
+
+          # Keep Shattered Anki Dungeon project metadata when upstream has
+          # files with the same names (notably README.md).
+          git checkout --ours -- README.md
+          git add README.md docs/ANKI_COMPATIBILITY.md docs/DESIGN.md \
+            .github/workflows/bootstrap_upstream.yml bootstrap/import-upstream.txt
+
+          conflicts="$(git diff --name-only --diff-filter=U)"
+          if [ -n "$conflicts" ]; then
+            echo "Unresolved bootstrap conflicts:"
+            echo "$conflicts"
+            exit 1
+          fi
+
+          git add -A
+          git commit -m "Bootstrap from Shattered Pixel Dungeon v4.0.1"
+
+      - name: Push bootstrap branch
+        run: git push --force-with-lease origin "$BOOTSTRAP_BRANCH"
+
+      - name: Open bootstrap pull request
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          if ! gh pr list --head "$BOOTSTRAP_BRANCH" --base main --state open --json number --jq 'length' | grep -q '^1$'; then
+            gh pr create \
+              --base main \
+              --head "$BOOTSTRAP_BRANCH" \
+              --title "Bootstrap from Shattered Pixel Dungeon v4.0.1" \
+              --body "Imports SPD v4.0.1 at \`$UPSTREAM_SHA\` while retaining Shattered Anki Dungeon project docs and compatibility design."
+          fi
