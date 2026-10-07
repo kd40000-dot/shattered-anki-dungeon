@@ -216,81 +216,107 @@ public class AndroidPlatformSupport extends PlatformSupport {
 		return true;
 	}
 
+	/**
+	 * The study IME uses one Activity-lifetime EditText. Reusing the same native
+	 * view avoids a race in Android's input-method manager where removing turn
+	 * one's focused view and immediately attaching a new one could crash on the
+	 * next review.
+	 */
 	@Override
 	public void startNativeTextInputProxy(String initialText, boolean multiline, NativeTextInputListener listener) {
 		AndroidLauncher.instance.runOnUiThread(() -> {
-			stopNativeTextInputProxyOnUiThread();
+			ensureNativeTextInputProxyOnUiThread();
 
 			final long generation = ++nativeTextInputGeneration;
-			final NativeTextInputListener sessionListener = listener;
 			nativeTextInputListener = listener;
-			EditText input = new EditText(AndroidLauncher.instance);
-			nativeTextInputProxy = input;
 
+			EditText input = nativeTextInputProxy;
 			input.setSingleLine(!multiline);
 			input.setMaxLines(multiline ? Integer.MAX_VALUE : 1);
 			input.setImeOptions(multiline ? EditorInfo.IME_FLAG_NO_ENTER_ACTION : EditorInfo.IME_ACTION_DONE);
 			input.setInputType(android.text.InputType.TYPE_CLASS_TEXT
 					| (multiline ? android.text.InputType.TYPE_TEXT_FLAG_MULTI_LINE : 0));
-			input.setBackground(null);
-			input.setPadding(0, 0, 0, 0);
-			input.setAlpha(0.01f);
-			input.setCursorVisible(false);
+
+			nativeTextInputUpdating = true;
 			input.setText(initialText == null ? "" : initialText);
 			input.setSelection(input.getText().length());
+			nativeTextInputUpdating = false;
 
-			nativeTextInputWatcher = new TextWatcher() {
-				@Override public void beforeTextChanged(CharSequence s, int start, int count, int after) {}
-				@Override public void onTextChanged(CharSequence s, int start, int before, int count) {}
+			input.setOnEditorActionListener((v, actionId, event) -> {
+				if (actionId != EditorInfo.IME_ACTION_DONE) return false;
 
-				@Override
-				public void afterTextChanged(Editable s) {
-					if (nativeTextInputUpdating || nativeTextInputListener == null) return;
-					String value = s == null ? "" : s.toString();
-					if (Gdx.app == null) return;
-					Gdx.app.postRunnable(() -> {
-						if (nativeTextInputGeneration == generation
-								&& nativeTextInputListener == sessionListener) {
-							sessionListener.onTextChanged(value);
-						}
-					});
+				NativeTextInputListener currentListener = nativeTextInputListener;
+				long currentGeneration = nativeTextInputGeneration;
+				if (currentListener == null || currentGeneration != generation || Gdx.app == null) {
+					return true;
 				}
-			};
-			input.addTextChangedListener(nativeTextInputWatcher);
 
-			if (!multiline) {
-				input.setOnEditorActionListener((v, actionId, event) -> {
-					if (actionId == EditorInfo.IME_ACTION_DONE) {
-						if (Gdx.app != null) {
-							Gdx.app.postRunnable(() -> {
-								if (nativeTextInputGeneration == generation
-										&& nativeTextInputListener == sessionListener) {
-									sessionListener.onEnterPressed();
-								}
-							});
-						}
-						return true;
+				Gdx.app.postRunnable(() -> {
+					if (nativeTextInputGeneration == currentGeneration
+							&& nativeTextInputListener == currentListener) {
+						currentListener.onEnterPressed();
 					}
-					return false;
 				});
-			}
-
-			FrameLayout.LayoutParams params = new FrameLayout.LayoutParams(1, 1);
-			params.gravity = Gravity.TOP | Gravity.START;
-			AndroidLauncher.instance.addContentView(input, params);
+				return true;
+			});
 
 			input.requestFocus();
 			InputMethodManager imm = (InputMethodManager) AndroidLauncher.instance.getSystemService(Context.INPUT_METHOD_SERVICE);
 			if (imm != null) {
-				input.post(() -> imm.showSoftInput(input, InputMethodManager.SHOW_IMPLICIT));
+				input.post(() -> {
+					if (nativeTextInputGeneration == generation && nativeTextInputListener == listener) {
+						imm.showSoftInput(input, InputMethodManager.SHOW_IMPLICIT);
+					}
+				});
 			}
 		});
+	}
+
+	private void ensureNativeTextInputProxyOnUiThread() {
+		if (nativeTextInputProxy != null) return;
+
+		EditText input = new EditText(AndroidLauncher.instance);
+		nativeTextInputProxy = input;
+
+		input.setBackground(null);
+		input.setPadding(0, 0, 0, 0);
+		input.setAlpha(0.01f);
+		input.setCursorVisible(false);
+
+		nativeTextInputWatcher = new TextWatcher() {
+			@Override public void beforeTextChanged(CharSequence s, int start, int count, int after) {}
+			@Override public void onTextChanged(CharSequence s, int start, int before, int count) {}
+
+			@Override
+			public void afterTextChanged(Editable s) {
+				if (nativeTextInputUpdating) return;
+
+				NativeTextInputListener listener = nativeTextInputListener;
+				if (listener == null || Gdx.app == null) return;
+
+				long generation = nativeTextInputGeneration;
+				String value = s == null ? "" : s.toString();
+
+				Gdx.app.postRunnable(() -> {
+					if (nativeTextInputGeneration == generation
+							&& nativeTextInputListener == listener) {
+						listener.onTextChanged(value);
+					}
+				});
+			}
+		};
+		input.addTextChangedListener(nativeTextInputWatcher);
+
+		FrameLayout.LayoutParams params = new FrameLayout.LayoutParams(1, 1);
+		params.gravity = Gravity.TOP | Gravity.START;
+		AndroidLauncher.instance.addContentView(input, params);
 	}
 
 	@Override
 	public void updateNativeTextInputProxy(String text) {
 		AndroidLauncher.instance.runOnUiThread(() -> {
-			if (nativeTextInputProxy == null) return;
+			if (nativeTextInputProxy == null || nativeTextInputListener == null) return;
+
 			String value = text == null ? "" : text;
 			if (value.contentEquals(nativeTextInputProxy.getText())) return;
 
@@ -305,6 +331,7 @@ public class AndroidPlatformSupport extends PlatformSupport {
 	public void setNativeTextInputProxyMaxLength(int maxLength) {
 		AndroidLauncher.instance.runOnUiThread(() -> {
 			if (nativeTextInputProxy == null) return;
+
 			if (maxLength > 0) {
 				nativeTextInputProxy.setFilters(new InputFilter[]{new InputFilter.LengthFilter(maxLength)});
 			} else {
@@ -319,11 +346,12 @@ public class AndroidPlatformSupport extends PlatformSupport {
 			if (nativeTextInputProxy == null) return;
 
 			InputMethodManager imm = (InputMethodManager) AndroidLauncher.instance.getSystemService(Context.INPUT_METHOD_SERVICE);
-			if (visible) {
+			if (visible && nativeTextInputListener != null) {
 				nativeTextInputProxy.requestFocus();
 				if (imm != null) imm.showSoftInput(nativeTextInputProxy, InputMethodManager.SHOW_IMPLICIT);
 			} else {
 				if (imm != null) imm.hideSoftInputFromWindow(nativeTextInputProxy.getWindowToken(), 0);
+				nativeTextInputProxy.clearFocus();
 			}
 		});
 	}
@@ -334,29 +362,45 @@ public class AndroidPlatformSupport extends PlatformSupport {
 	}
 
 	private void stopNativeTextInputProxyOnUiThread() {
-		if (nativeTextInputProxy == null) {
-			nativeTextInputListener = null;
-			return;
-		}
+		nativeTextInputGeneration++;
+		nativeTextInputListener = null;
+
+		if (nativeTextInputProxy == null) return;
 
 		InputMethodManager imm = (InputMethodManager) AndroidLauncher.instance.getSystemService(Context.INPUT_METHOD_SERVICE);
 		if (imm != null) {
 			imm.hideSoftInputFromWindow(nativeTextInputProxy.getWindowToken(), 0);
 		}
 
-		if (nativeTextInputWatcher != null) {
-			nativeTextInputProxy.removeTextChangedListener(nativeTextInputWatcher);
-		}
+		nativeTextInputProxy.setOnEditorActionListener(null);
+		nativeTextInputProxy.clearFocus();
 
-		if (nativeTextInputProxy.getParent() instanceof android.view.ViewGroup) {
-			((android.view.ViewGroup) nativeTextInputProxy.getParent()).removeView(nativeTextInputProxy);
-		}
-
-		nativeTextInputProxy = null;
-		nativeTextInputWatcher = null;
-		nativeTextInputListener = null;
+		// Keep the native view attached for the next review turn. Clearing its
+		// contents prevents old composing text from leaking into the next card.
+		nativeTextInputUpdating = true;
+		nativeTextInputProxy.setText("");
 		nativeTextInputUpdating = false;
-		nativeTextInputGeneration++;
+	}
+
+	/** Permanently releases the Activity-owned native input view. */
+	public void destroyNativeTextInputProxy() {
+		AndroidLauncher.instance.runOnUiThread(() -> {
+			stopNativeTextInputProxyOnUiThread();
+
+			if (nativeTextInputProxy == null) return;
+
+			if (nativeTextInputWatcher != null) {
+				nativeTextInputProxy.removeTextChangedListener(nativeTextInputWatcher);
+			}
+
+			if (nativeTextInputProxy.getParent() instanceof android.view.ViewGroup) {
+				((android.view.ViewGroup) nativeTextInputProxy.getParent()).removeView(nativeTextInputProxy);
+			}
+
+			nativeTextInputProxy = null;
+			nativeTextInputWatcher = null;
+			nativeTextInputUpdating = false;
+		});
 	}
 
 	/* FONT SUPPORT */
