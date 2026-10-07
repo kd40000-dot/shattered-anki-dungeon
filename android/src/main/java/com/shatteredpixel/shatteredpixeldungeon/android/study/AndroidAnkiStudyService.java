@@ -13,6 +13,7 @@ import android.os.Build;
 import com.badlogic.gdx.Application;
 import com.badlogic.gdx.Gdx;
 import com.shatteredpixel.shatteredpixeldungeon.study.StudyCard;
+import com.shatteredpixel.shatteredpixeldungeon.study.StudyDiagnostics;
 import com.shatteredpixel.shatteredpixeldungeon.study.StudyService;
 
 import java.util.ArrayList;
@@ -195,6 +196,7 @@ public final class AndroidAnkiStudyService implements StudyService {
 
     @Override
     public void loadNextCard(CardCallback callback) {
+        StudyDiagnostics.mark("provider loadNextCard requested backend=" + backendName());
         AndroidAnkiBridge bridge = connect();
         if (bridge == null) {
             post(() -> callback.onError("No compatible AnkiDroid installation was found."));
@@ -214,6 +216,8 @@ public final class AndroidAnkiStudyService implements StudyService {
             worker.execute(() -> {
                 try {
                     AndroidAnkiBridge.ReviewCard card = bridge.loadNextCard();
+                StudyDiagnostics.mark("provider loadNextCard worker result="
+                        + (card == null ? "null" : "note=" + card.noteId + " ord=" + card.ord));
                 if (card == null) {
                     post(callback::onNoCardsDue);
                     return;
@@ -241,6 +245,9 @@ public final class AndroidAnkiStudyService implements StudyService {
 
     @Override
     public void answer(StudyCard card, int ease, long timeTakenMs, AnswerCallback callback) {
+        StudyDiagnostics.mark("provider answer requested note="
+                + (card == null ? "null" : card.noteId + "/" + card.ord)
+                + " ease=" + ease + " ms=" + timeTakenMs);
         if (card == null) {
             post(() -> callback.onError("No review card is active."));
             return;
@@ -264,7 +271,10 @@ public final class AndroidAnkiStudyService implements StudyService {
         try {
             worker.execute(() -> {
                 try {
-                    if (bridge.answer(card.noteId, card.ord, ease, timeTakenMs)) {
+                    boolean accepted = bridge.answer(card.noteId, card.ord, ease, timeTakenMs);
+                StudyDiagnostics.mark("provider answer worker accepted=" + accepted
+                        + " note=" + card.noteId + "/" + card.ord);
+                if (accepted) {
                     post(callback::onAnswered);
                 } else {
                     post(() -> callback.onError("AnkiDroid did not accept the review result."));
