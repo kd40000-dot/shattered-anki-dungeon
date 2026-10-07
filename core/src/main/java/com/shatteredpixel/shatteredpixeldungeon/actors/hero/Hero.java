@@ -1532,11 +1532,21 @@ public class Hero extends Char {
 		sprite.attack(attackTarget.pos);
 	}
 
-	/** Consume the normal attack turn without dealing damage. */
+	/**
+	 * Consume one normal attack-duration turn without dealing damage.
+	 *
+	 * This deliberately mirrors the scheduler handoff used by a completed
+	 * attack: spend the delay, clear the intercepted attack state, then let
+	 * Char.onAttackComplete() release the actor thread. Using spendAndNext()
+	 * here was unsafe because it called busy()/next() from the async Anki
+	 * callback instead of completing the suspended attack lifecycle.
+	 */
 	public void studyAttackFailed() {
+		float delay = attackDelay();
 		curAction = null;
 		attackTarget = null;
-		spendAndNext(attackDelay());
+		spend(delay);
+		super.onAttackComplete();
 	}
 
 	/** Abort the pending attack without spending a turn. */
