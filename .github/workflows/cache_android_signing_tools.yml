@@ -1,0 +1,34 @@
+name: Cache Android signing tools
+
+on:
+  push:
+    branches:
+      - chatgpt/signing-tools-cache
+
+jobs:
+  fetch-tools:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Download Android Build Tools 36
+        shell: bash
+        run: |
+          set -euo pipefail
+          curl -fL --retry 3 -o build-tools.zip https://dl.google.com/android/repository/build-tools_r36_linux.zip
+          mkdir unpack out
+          unzip -q build-tools.zip -d unpack
+          ZIPALIGN="$(find unpack -type f -name zipalign | head -n1)"
+          APKSIGNER="$(find unpack -type f -name apksigner | head -n1)"
+          APKSIGNER_JAR="$(find unpack -type f -name apksigner.jar | head -n1)"
+          test -n "$ZIPALIGN"
+          test -n "$APKSIGNER"
+          test -n "$APKSIGNER_JAR"
+          cp "$ZIPALIGN" out/zipalign
+          cp "$APKSIGNER" out/apksigner
+          cp "$APKSIGNER_JAR" out/apksigner.jar
+          chmod +x out/zipalign out/apksigner
+      - name: Upload signing tools
+        uses: actions/upload-artifact@v4
+        with:
+          name: android-signing-tools
+          path: out/
+          if-no-files-found: error
