@@ -229,9 +229,7 @@ public class HeroSelectScene extends PixelScene {
 		updateOptionsColor();
 		btnOptions.visible = false;
 
-		if(!SPDSettings.intro()){
-			add(btnOptions);
-		}
+		add(btnOptions);
 
 		if (!Badges.isUnlocked(Badges.Badge.VICTORY) && !DeviceCompat.isDebug()){
 			Dungeon.challenges = 0;
@@ -454,7 +452,7 @@ public class HeroSelectScene extends PixelScene {
 			infoButton.setPos(heroName.right(), heroName.top() + (heroName.height() - infoButton.height())/2f);
 			align(infoButton);
 
-			btnOptions.visible = btnOptions.active = !SPDSettings.intro();
+			btnOptions.visible = btnOptions.active = true;
 
 		} else {
 			title.visible = false;
@@ -469,7 +467,7 @@ public class HeroSelectScene extends PixelScene {
 			infoButton.visible = infoButton.active = true;
 			infoButton.setPos(startBtn.right(), startBtn.top());
 
-			btnOptions.visible = btnOptions.active = !SPDSettings.intro();
+			btnOptions.visible = btnOptions.active = true;
 			btnOptions.setPos(startBtn.left()-btnOptions.width(), startBtn.top());
 
 			optionsPane.setPos(heroBtns.get(0).left(), startBtn.top() - optionsPane.height() - 2);
@@ -636,6 +634,30 @@ public class HeroSelectScene extends PixelScene {
 
 			buttons = new ArrayList<>();
 			spacers = new ArrayList<>();
+			StyledButton studyButton = new StyledButton(
+					Chrome.Type.BLANK,
+					Messages.get(HeroSelectScene.class, SPDSettings.studyConjureFood() ? "conjure_food_on" : "conjure_food_off"),
+					6) {
+				@Override
+				protected void onClick() {
+					super.onClick();
+					boolean enabled = !SPDSettings.studyConjureFood();
+					SPDSettings.studyConjureFood(enabled);
+					text(Messages.get(HeroSelectScene.class, enabled ? "conjure_food_on" : "conjure_food_off"));
+					icon(Icons.get(enabled ? Icons.CHECKED : Icons.UNCHECKED));
+				}
+			};
+			studyButton.leftJustify = true;
+			studyButton.icon(Icons.get(SPDSettings.studyConjureFood() ? Icons.CHECKED : Icons.UNCHECKED));
+			add(studyButton);
+			buttons.add(studyButton);
+
+			// Upstream hides advanced game options for a player's first run.
+			// Keep that behavior, but always let them choose classic hunger vs study mode.
+			if (SPDSettings.intro()) {
+				return;
+			}
+
 			StyledButton seedButton = new StyledButton(Chrome.Type.BLANK, Messages.get(HeroSelectScene.class, "custom_seed"), 6){
 				@Override
 				protected void onClick() {
@@ -794,24 +816,6 @@ public class HeroSelectScene extends PixelScene {
 			dailyButton.icon(Icons.get(Icons.CALENDAR));
 			add(dailyButton);
 			buttons.add(dailyButton);
-
-			StyledButton studyButton = new StyledButton(
-					Chrome.Type.BLANK,
-					Messages.get(HeroSelectScene.class, SPDSettings.studyConjureFood() ? "conjure_food_on" : "conjure_food_off"),
-					6) {
-				@Override
-				protected void onClick() {
-					super.onClick();
-					boolean enabled = !SPDSettings.studyConjureFood();
-					SPDSettings.studyConjureFood(enabled);
-					text(Messages.get(HeroSelectScene.class, enabled ? "conjure_food_on" : "conjure_food_off"));
-					icon(Icons.get(enabled ? Icons.CHECKED : Icons.UNCHECKED));
-				}
-			};
-			studyButton.leftJustify = true;
-			studyButton.icon(Icons.get(SPDSettings.studyConjureFood() ? Icons.CHECKED : Icons.UNCHECKED));
-			add(studyButton);
-			buttons.add(studyButton);
 
 			challengeButton = new StyledButton(Chrome.Type.BLANK, Messages.get(WndChallenges.class, "title"), 6){
 				@Override
