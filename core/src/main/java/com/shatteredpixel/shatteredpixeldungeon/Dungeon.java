@@ -75,6 +75,7 @@ import com.shatteredpixel.shatteredpixeldungeon.levels.rooms.secret.SecretRoom;
 import com.shatteredpixel.shatteredpixeldungeon.levels.rooms.special.SpecialRoom;
 import com.shatteredpixel.shatteredpixeldungeon.messages.Messages;
 import com.shatteredpixel.shatteredpixeldungeon.scenes.GameScene;
+import com.shatteredpixel.shatteredpixeldungeon.study.StudyRunState;
 import com.shatteredpixel.shatteredpixeldungeon.ui.QuickSlotButton;
 import com.shatteredpixel.shatteredpixeldungeon.ui.Toolbar;
 import com.shatteredpixel.shatteredpixeldungeon.utils.DungeonSeed;
@@ -254,6 +255,7 @@ public class Dungeon {
 		Random.resetGenerators();
 		
 		Statistics.reset();
+		StudyRunState.reset(SPDSettings.studyConjureFood());
 		Notes.reset();
 
 		quickslot.reset();
@@ -613,6 +615,7 @@ public class Dungeon {
 	private static final String GENERATED_LEVELS    = "generated_levels";
 	private static final String GOLD		= "gold";
 	private static final String ENERGY		= "energy";
+	private static final String STUDY_RUN	= "study_run";
 	private static final String DROPPED     = "dropped%d";
 	private static final String PORTED      = "ported%d";
 	private static final String LEVEL		= "level";
@@ -640,6 +643,10 @@ public class Dungeon {
 
 			bundle.put( GOLD, gold );
 			bundle.put( ENERGY, energy );
+
+			Bundle studyRun = new Bundle();
+			StudyRunState.storeInBundle( studyRun );
+			bundle.put( STUDY_RUN, studyRun );
 
 			for (int d : droppedItems.keyArray()) {
 				bundle.put(Messages.format(DROPPED, d), droppedItems.get(d));
@@ -741,6 +748,12 @@ public class Dungeon {
 
 		Dungeon.challenges = bundle.getInt( CHALLENGES );
 		Dungeon.mobsToChampion = bundle.getFloat( MOBS_TO_CHAMPION );
+
+		if (bundle.contains( STUDY_RUN )) {
+			StudyRunState.restoreFromBundle( bundle.getBundle( STUDY_RUN ), SPDSettings.studyConjureFood() );
+		} else {
+			StudyRunState.reset( SPDSettings.studyConjureFood() );
+		}
 		
 		Dungeon.level = null;
 		Dungeon.depth = -1;
