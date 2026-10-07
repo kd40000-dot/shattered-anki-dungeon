@@ -10,9 +10,10 @@
 
 package com.shatteredpixel.shatteredpixeldungeon.windows;
 
+import com.shatteredpixel.shatteredpixeldungeon.Chrome;
 import com.shatteredpixel.shatteredpixeldungeon.scenes.PixelScene;
 import com.shatteredpixel.shatteredpixeldungeon.ui.ItemSlot;
-import com.shatteredpixel.shatteredpixeldungeon.ui.RedButton;
+import com.shatteredpixel.shatteredpixeldungeon.ui.StyledButton;
 import com.shatteredpixel.shatteredpixeldungeon.ui.RenderedTextBlock;
 import com.shatteredpixel.shatteredpixeldungeon.ui.Window;
 
@@ -58,7 +59,7 @@ public abstract class WndStudyRating extends Window {
         int count = Math.min(options == null ? 0 : options.length, 4);
         for (int i = 0; i < count; i++) {
             final int index = i;
-            RedButton button = new RedButton(options[i], 8) {
+            StyledButton button = new StyledButton(Chrome.Type.GREY_BUTTON, options[i], 8) {
                 @Override
                 protected void onClick() {
                     hide();
