@@ -281,7 +281,7 @@ public final class CombatStudy {
             // Match the Andor integration: once a card has been missed and is
             // finally answered correctly, every visible option shows the Again
             // interval because Again is the rating that will actually be saved.
-            int intervalIndex = correctRetry ? 0 : i;
+            int intervalIndex = displayIntervalIndex(correctRetry, i);
             String interval = intervalIndex < shownCard.nextReviewTimes.length
                     ? shownCard.nextReviewTimes[intervalIndex]
                     : "";
@@ -349,7 +349,7 @@ public final class CombatStudy {
                 + " note=" + shownCard.noteId + " token=" + token);
 
         final int effectiveEase =
-                result == Result.CORRECT && retryPenaltyActive ? 1 : pressedEase;
+                resolvedEase(result == Result.CORRECT, retryPenaltyActive, pressedEase);
         final boolean shouldAttack = result == Result.CORRECT;
         final Hero hero = pendingHero;
         final Char target = pendingTarget;
@@ -471,6 +471,14 @@ public final class CombatStudy {
                 }
             }
         });
+    }
+
+    static int resolvedEase(boolean correct, boolean retryPenalty, int pressedEase) {
+        return correct && retryPenalty ? 1 : pressedEase;
+    }
+
+    static int displayIntervalIndex(boolean correctRetry, int buttonIndex) {
+        return correctRetry ? 0 : buttonIndex;
     }
 
     private static String safe(String value) {
