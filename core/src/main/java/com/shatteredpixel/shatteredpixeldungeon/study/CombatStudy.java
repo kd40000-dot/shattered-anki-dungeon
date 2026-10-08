@@ -45,6 +45,8 @@ public final class CombatStudy {
     private static boolean loading;
     private static boolean submitting;
     private static boolean currentAttemptIsRetry;
+    /** Stays true across every Wrong -> Again retry until this card is finally resolved. */
+    private static boolean retryPenaltyActive;
     private static Result result;
     private static long attemptStartedAt;
 
@@ -116,13 +118,15 @@ public final class CombatStudy {
 
         if (pendingRetryCard != null) {
             StudyDiagnostics.mark("combat restoring retry card note=" + pendingRetryCard.noteId
-                    + " ord=" + pendingRetryCard.ord + " token=" + token);
+                    + " ord=" + pendingRetryCard.ord + " token=" + token
+                    + " forceAgain=" + retryPenaltyActive);
             card = pendingRetryCard;
             pendingRetryCard = null;
-            currentAttemptIsRetry = true;
+            currentAttemptIsRetry = retryPenaltyActive;
             showQuestion(token);
         } else {
             currentAttemptIsRetry = false;
+            retryPenaltyActive = false;
             loadNextCard(token);
         }
         return true;
@@ -134,6 +138,7 @@ public final class CombatStudy {
         }
         clearSessionState(true);
         pendingRetryCard = null;
+        retryPenaltyActive = false;
     }
 
     private static void loadNextCard(final long token) {
@@ -270,9 +275,16 @@ public final class CombatStudy {
 
         int count = Math.max(1, Math.min(4, shownCard.buttonCount));
         String[] options = new String[count];
+        final boolean correctRetry = result == Result.CORRECT && retryPenaltyActive;
         for (int i = 0; i < count; i++) {
             String label = Messages.get(CombatStudy.class, EASE_KEYS[i]);
-            String interval = i < shownCard.nextReviewTimes.length ? shownCard.nextReviewTimes[i] : "";
+            // Match the Andor integration: once a card has been missed and is
+            // finally answered correctly, every visible option shows the Again
+            // interval because Again is the rating that will actually be saved.
+            int intervalIndex = displayIntervalIndex(correctRetry, i);
+            String interval = intervalIndex < shownCard.nextReviewTimes.length
+                    ? shownCard.nextReviewTimes[intervalIndex]
+                    : "";
             options[i] = interval == null || interval.trim().isEmpty()
                     ? label
                     : label + "\n" + interval;
@@ -313,6 +325,10 @@ public final class CombatStudy {
                     + " token=" + token + " heroReady=" + pendingHero.ready);
             Hero hero = pendingHero;
 
+            // Once a card is missed, keep the Again penalty alive across every
+            // local retry until the review is actually accepted by Anki.
+            retryPenaltyActive = true;
+
             // Preserve only immutable card data. The current study session,
             // token, windows, and IME ownership are fully ended before the
             // skipped combat turn is released to SPD.
@@ -333,7 +349,7 @@ public final class CombatStudy {
                 + " note=" + shownCard.noteId + " token=" + token);
 
         final int effectiveEase =
-                result == Result.CORRECT && currentAttemptIsRetry ? 1 : pressedEase;
+                resolvedEase(result == Result.CORRECT, retryPenaltyActive, pressedEase);
         final boolean shouldAttack = result == Result.CORRECT;
         final Hero hero = pendingHero;
         final Char target = pendingTarget;
@@ -406,6 +422,7 @@ public final class CombatStudy {
         clearSessionState(true);
         if (!preserveRetryCard) {
             pendingRetryCard = null;
+            retryPenaltyActive = false;
         }
     }
 
@@ -454,6 +471,14 @@ public final class CombatStudy {
                 }
             }
         });
+    }
+
+    static int resolvedEase(boolean correct, boolean retryPenalty, int pressedEase) {
+        return correct && retryPenalty ? 1 : pressedEase;
+    }
+
+    static int displayIntervalIndex(boolean correctRetry, int buttonIndex) {
+        return correctRetry ? 0 : buttonIndex;
     }
 
     private static String safe(String value) {
