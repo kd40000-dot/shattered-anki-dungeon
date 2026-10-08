@@ -15,6 +15,7 @@ import java.util.concurrent.atomic.AtomicInteger;
 
 import com.badlogic.gdx.Application;
 import com.badlogic.gdx.Gdx;
+import com.shatteredpixel.shatteredpixeldungeon.SPDSettings;
 import com.shatteredpixel.shatteredpixeldungeon.study.StudyCard;
 import com.shatteredpixel.shatteredpixeldungeon.study.StudyDiagnostics;
 import com.shatteredpixel.shatteredpixeldungeon.study.StudyService;
@@ -285,7 +286,11 @@ public final class AndroidAnkiStudyService implements StudyService {
                             try { failed.release(); } catch (RuntimeException ignored) {}
                             return true;
                         });
-                        player.start();
+                        int setting = SPDSettings.ankiVolume();
+                        float volume = setting * setting / 100f;
+                        player.setVolume(volume, volume);
+                        if (setting > 0) player.start();
+                        else releaseAudio();
                     } catch (RuntimeException ignored) {
                         releaseAudio();
                     }
