@@ -885,6 +885,7 @@ public class WndSettings extends WndTabbed {
 		CheckBox chkMusicMute;
 		ColorBlock sep2;
 		OptionSlider optSFX;
+		OptionSlider optAnki;
 		CheckBox chkMuteSFX;
 		ColorBlock sep3;
 		CheckBox chkIgnoreSilent;
@@ -951,6 +952,15 @@ public class WndSettings extends WndTabbed {
 			chkMuteSFX.checked(!SPDSettings.soundFx());
 			add( chkMuteSFX );
 
+			optAnki = new OptionSlider(Messages.get(this, "anki_vol"), "0", "10", 0, 10) {
+				@Override
+				protected void onChange() {
+					SPDSettings.ankiVolume(getSelectedValue());
+				}
+			};
+			optAnki.setSelectedValue(SPDSettings.ankiVolume());
+			add(optAnki);
+
 			if (DeviceCompat.isiOS()){
 
 				sep3 = new ColorBlock(1, 1, 0xFF000000);
@@ -1010,11 +1020,12 @@ public class WndSettings extends WndTabbed {
 				chkMuteSFX.setRect(0, optSFX.bottom() + GAP, width, BTN_HEIGHT);
 			}
 
-			height = chkMuteSFX.bottom();
+			optAnki.setRect(0, chkMuteSFX.bottom() + GAP, width, SLIDER_HEIGHT);
+			height = optAnki.bottom();
 
 			if (chkIgnoreSilent != null){
 				sep3.size(width, 1);
-				sep3.y = chkMuteSFX.bottom() + GAP;
+				sep3.y = optAnki.bottom() + GAP;
 
 				chkIgnoreSilent.setRect(0, sep3.y + 1 + GAP, width, BTN_HEIGHT);
 				height = chkIgnoreSilent.bottom();
