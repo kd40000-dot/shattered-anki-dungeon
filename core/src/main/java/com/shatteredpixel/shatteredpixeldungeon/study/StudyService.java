@@ -48,6 +48,9 @@ public interface StudyService {
     /** Loads the next due card without blocking the game/render thread. */
     void loadNextCard(CardCallback callback);
 
+    /** Plays the revealed answer pronunciation, if the provider exposes audio. */
+    void playAnswerAudio(StudyCard card, String typedAnswer);
+
     /** Submits a rating (Anki ease 1..4) without blocking the game/render thread. */
     void answer(StudyCard card, int ease, long timeTakenMs, AnswerCallback callback);
 }
