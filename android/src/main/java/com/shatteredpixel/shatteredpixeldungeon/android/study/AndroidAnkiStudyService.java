@@ -9,6 +9,9 @@ package com.shatteredpixel.shatteredpixeldungeon.android.study;
 
 import android.app.Activity;
 import android.os.Build;
+import android.media.MediaPlayer;
+import android.net.Uri;
+import java.util.concurrent.atomic.AtomicInteger;
 
 import com.badlogic.gdx.Application;
 import com.badlogic.gdx.Gdx;
@@ -39,6 +42,8 @@ public final class AndroidAnkiStudyService implements StudyService {
     private final List<AccessCallback> pendingAccessCallbacks = new ArrayList<>();
     private boolean permissionRequestInFlight;
     private volatile boolean destroyed;
+    private final AtomicInteger audioSequence = new AtomicInteger();
+    private MediaPlayer audioPlayer;
 
     public AndroidAnkiStudyService(Activity activity) {
         this.activity = activity;
@@ -169,6 +174,8 @@ public final class AndroidAnkiStudyService implements StudyService {
     public void onHostDestroy() {
         destroyed = true;
         finishAccessRequest(false, "The game closed before AnkiDroid access finished.");
+        audioSequence.incrementAndGet();
+        activity.runOnUiThread(this::releaseAudio);
         worker.shutdownNow();
     }
 
@@ -241,6 +248,60 @@ public final class AndroidAnkiStudyService implements StudyService {
         } catch (RuntimeException e) {
             post(() -> callback.onError(errorMessage(e)));
         }
+    }
+
+
+    @Override
+    public void playAnswerAudio(StudyCard card, String typedAnswer) {
+        final int sequence = audioSequence.incrementAndGet();
+        post(this::releaseAudio);
+        if (destroyed || card == null) return;
+        AndroidAnkiBridge bridge = connect();
+        if (bridge == null || !bridge.hasPermission()) return;
+        try {
+            worker.execute(() -> {
+                Uri uri;
+                try {
+                    uri = bridge.answerAudioUri(
+                            card.noteId, card.answer, typedAnswer, card.mediaFiles);
+                } catch (RuntimeException ignored) {
+                    return; // Missing or inaccessible media must never interrupt combat.
+                }
+                if (uri == null || destroyed || sequence != audioSequence.get()) return;
+                post(() -> {
+                    if (destroyed || sequence != audioSequence.get()) return;
+                    releaseAudio();
+                    try {
+                        MediaPlayer player = MediaPlayer.create(
+                                activity.getApplicationContext(), uri);
+                        if (player == null) return;
+                        audioPlayer = player;
+                        player.setOnCompletionListener(finished -> {
+                            if (audioPlayer == finished) audioPlayer = null;
+                            finished.release();
+                        });
+                        player.setOnErrorListener((failed, what, extra) -> {
+                            if (audioPlayer == failed) audioPlayer = null;
+                            try { failed.release(); } catch (RuntimeException ignored) {}
+                            return true;
+                        });
+                        player.start();
+                    } catch (RuntimeException ignored) {
+                        releaseAudio();
+                    }
+                });
+            });
+        } catch (RuntimeException ignored) {
+            // Worker shut down as Activity exits.
+        }
+    }
+
+    private void releaseAudio() {
+        MediaPlayer player = audioPlayer;
+        audioPlayer = null;
+        if (player == null) return;
+        try { player.stop(); } catch (RuntimeException ignored) {}
+        try { player.release(); } catch (RuntimeException ignored) {}
     }
 
     @Override

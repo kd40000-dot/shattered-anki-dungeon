@@ -186,6 +186,8 @@ public final class ConjureFoodStudy {
                     : label + "\n" + interval;
         }
 
+        Study.service.playAnswerAudio(card, typed);
+
         ShatteredPixelDungeon.scene().addToFront(new WndStudyRating(
                 correct
                         ? Messages.get(ConjureFoodStudy.class, "correct")

@@ -290,6 +290,8 @@ public final class CombatStudy {
                     : label + "\n" + interval;
         }
 
+        Study.service.playAnswerAudio(shownCard, typed);
+
         ShatteredPixelDungeon.scene().addToFront(new WndStudyRating(
                 title,
                 titleColor,

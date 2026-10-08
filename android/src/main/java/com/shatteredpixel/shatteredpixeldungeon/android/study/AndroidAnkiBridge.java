@@ -363,6 +363,97 @@ public final class AndroidAnkiBridge {
         return safe(fallback);
     }
 
+
+    /**
+     * Resolve pronunciation through the same media ContentProvider URI used by
+     * the working Andor's Trail integration. Multiple-answer notes include an
+     * audio map in their Notes field; never play an arbitrary alternative.
+     * Must be called on the provider worker, not the render thread.
+     */
+    public Uri answerAudioUri(long noteId, String expected, String typed, String[] mediaFiles) {
+        String filename = firstAudioFile(mediaFiles);
+        String[] alternatives = safe(expected).split("\\|", -1);
+        if (alternatives.length > 1) {
+            int matched = -1;
+            for (int i = 0; i < alternatives.length; i++) {
+                if (alternatives[i].trim().equalsIgnoreCase(safe(typed).trim())) {
+                    matched = i;
+                    break;
+                }
+            }
+            if (matched < 0) return null;
+            String[] mapped = loadAudioMap(noteId, alternatives);
+            if (mapped == null || matched >= mapped.length) return null;
+            filename = mapped[matched];
+        }
+        if (filename == null || filename.trim().isEmpty()) return null;
+        return new Uri.Builder().scheme("content").authority(backend.authority)
+                .appendPath("media").appendPath(filename).build();
+    }
+
+    private String[] loadAudioMap(long noteId, String[] alternatives) {
+        try {
+            long modelId;
+            String fieldsEncoded;
+            try (Cursor note = resolver.query(backend.noteUri(noteId),
+                    new String[]{"mid", "flds"}, null, null, null)) {
+                if (note == null || !note.moveToFirst()) return null;
+                modelId = note.getLong(note.getColumnIndexOrThrow("mid"));
+                fieldsEncoded = note.getString(note.getColumnIndexOrThrow("flds"));
+            }
+            String namesEncoded;
+            try (Cursor model = resolver.query(backend.modelUri(modelId),
+                    new String[]{"field_names"}, null, null, null)) {
+                if (model == null || !model.moveToFirst()) return null;
+                namesEncoded = model.getString(model.getColumnIndexOrThrow("field_names"));
+            }
+            String[] names = safe(namesEncoded).split("\\u001f", -1);
+            String[] fields = safe(fieldsEncoded).split("\\u001f", -1);
+            String notes = null;
+            for (int i = 0; i < Math.min(names.length, fields.length); i++) {
+                if ("Notes".equalsIgnoreCase(names[i].trim())) {
+                    notes = fields[i];
+                    break;
+                }
+            }
+            if (notes == null) return null;
+            String prefix = "<!--anki-audio-map:";
+            int start = notes.indexOf(prefix);
+            if (start < 0) return null;
+            int end = notes.indexOf("-->", start + prefix.length());
+            if (end < 0) return null;
+            org.json.JSONObject mapping = new org.json.JSONObject(
+                    notes.substring(start + prefix.length(), end).trim());
+            String[] result = new String[alternatives.length];
+            for (int i = 0; i < alternatives.length; i++) {
+                java.util.Iterator<String> keys = mapping.keys();
+                while (keys.hasNext()) {
+                    String key = keys.next();
+                    if (key.trim().equalsIgnoreCase(alternatives[i].trim())) {
+                        result[i] = mapping.optString(key, "").trim();
+                        break;
+                    }
+                }
+            }
+            return result;
+        } catch (Exception ignored) {
+            return null;
+        }
+    }
+
+    private static String firstAudioFile(String[] files) {
+        if (files == null) return null;
+        for (String file : files) {
+            String name = safe(file).trim();
+            String lower = name.toLowerCase(java.util.Locale.ROOT);
+            if (lower.endsWith(".mp3") || lower.endsWith(".ogg")
+                    || lower.endsWith(".opus") || lower.endsWith(".wav")
+                    || lower.endsWith(".m4a") || lower.endsWith(".aac")
+                    || lower.endsWith(".flac")) return name;
+        }
+        return null;
+    }
+
     private static String[] jsonArrayToStrings(String json) {
         if (json == null || json.isEmpty()) {
             return new String[0];
