@@ -1543,11 +1543,19 @@ public class Hero extends Char {
 	 * callback instead of completing the suspended attack lifecycle.
 	 */
 	public void studyAttackFailed() {
+		Char repeatTarget = attackTarget;
 		float delay = attackDelay();
-		curAction = null;
+		curAction = repeatableStudyTarget(repeatTarget) ? new HeroAction.Attack(repeatTarget) : null;
 		attackTarget = null;
 		spend(delay);
 		super.onAttackComplete();
+	}
+
+	/** Queue only another adjacent, visible attack. The ordinary actor turn still runs. */
+	private boolean repeatableStudyTarget(Char target) {
+		return com.shatteredpixel.shatteredpixeldungeon.study.StudyRunState.combatEnabled()
+				&& target != null && isAlive() && target.isAlive()
+				&& canAttack(target) && target.invisible == 0 && !isCharmedBy(target);
 	}
 
 	/** Abort the pending attack without spending a turn. */
@@ -2431,7 +2439,8 @@ public class Hero extends Char {
 			Buff.affect( this, Sai.ComboStrikeTracker.class).addHit( attackTarget );
 		}
 
-		curAction = null;
+		Char repeatTarget = attackTarget;
+		curAction = repeatableStudyTarget(repeatTarget) ? new HeroAction.Attack(repeatTarget) : null;
 		attackTarget = null;
 
 		super.onAttackComplete();

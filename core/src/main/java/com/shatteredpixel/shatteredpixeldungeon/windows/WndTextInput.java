@@ -236,6 +236,19 @@ public class WndTextInput extends Window {
 
 		final RedButton positiveBtn = new RedButton(posTxt) {
 			@Override
+			protected void onPointerDown() {
+				super.onPointerDown();
+				// Do not consume the first Check tap merely to dismiss the IME.
+				PointerEvent.clearKeyboardThisPress = false;
+			}
+
+			@Override
+			protected void onPointerUp() {
+				super.onPointerUp();
+				PointerEvent.clearKeyboardThisPress = false;
+			}
+
+			@Override
 			protected void onClick() {
 				if (selectionResolved) return;
 				selectionResolved = true;
