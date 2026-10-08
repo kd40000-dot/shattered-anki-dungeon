@@ -402,7 +402,17 @@ public class SPDSettings extends GameSettings {
 	public static final String KEY_SFX_VOL      = "sfx_vol";
 	public static final String KEY_IGNORE_SILENT= "ignore_silent";
 	public static final String KEY_MUSIC_BG     = "music_bg";
+	public static final String KEY_ANKI_VOLUME  = "anki_volume";
 	
+	/** Independent pronunciation volume, 0 (silent) through 10. */
+	public static void ankiVolume(int value) {
+		put(KEY_ANKI_VOLUME, Math.max(0, Math.min(10, value)));
+	}
+
+	public static int ankiVolume() {
+		return getInt(KEY_ANKI_VOLUME, 10, 0, 10);
+	}
+
 	public static void music( boolean value ) {
 		Music.INSTANCE.enable( value );
 		put( KEY_MUSIC, value );
