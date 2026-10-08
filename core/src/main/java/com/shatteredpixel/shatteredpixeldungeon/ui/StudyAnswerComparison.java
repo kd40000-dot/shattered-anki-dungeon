@@ -30,14 +30,40 @@ public class StudyAnswerComparison extends Component {
     private static final int LABEL_SIZE = 7;
     private static final int MIN_HEIGHT = 42;
 
+    // SPD's bitmap font gives literal spaces almost no visible advance when
+    // rendered as isolated per-character blocks. Use a deliberate word gap.
+    private static final float WORD_SPACE = 4f;
+
     private static final int MATCH_COLOR = ItemSlot.UPGRADED;
     private static final int WRONG_COLOR = ItemSlot.DEGRADED;
     private static final int MISSING_COLOR = ItemSlot.WARNING;
     private static final int NEUTRAL_COLOR = ItemSlot.FADED;
 
+    private static final class Token {
+        final RenderedTextBlock block;
+        final float spacerWidth;
+
+        private Token(RenderedTextBlock block, float spacerWidth) {
+            this.block = block;
+            this.spacerWidth = spacerWidth;
+        }
+
+        static Token text(RenderedTextBlock block) {
+            return new Token(block, 0f);
+        }
+
+        static Token spacer(float width) {
+            return new Token(null, width);
+        }
+
+        boolean isSpacer() {
+            return block == null;
+        }
+    }
+
     private final NinePatch frame;
-    private final List<RenderedTextBlock> typedRow = new ArrayList<>();
-    private final List<RenderedTextBlock> answerRow = new ArrayList<>();
+    private final List<Token> typedRow = new ArrayList<>();
+    private final List<Token> answerRow = new ArrayList<>();
 
     public StudyAnswerComparison(
             float width,
@@ -70,11 +96,10 @@ public class StudyAnswerComparison extends Component {
         } else {
             for (StudyAnswerDiff.Piece piece : pieces) {
                 if (piece.typed == null) continue;
-                addText(
+                addCharacter(
                         typedRow,
-                        String.valueOf(piece.typed),
-                        piece.match ? MATCH_COLOR : WRONG_COLOR,
-                        CHAR_SIZE
+                        piece.typed,
+                        piece.match ? MATCH_COLOR : WRONG_COLOR
                 );
             }
         }
@@ -82,25 +107,33 @@ public class StudyAnswerComparison extends Component {
         addLabel(answerRow, answerLabel == null ? "Answer:" : answerLabel);
         for (StudyAnswerDiff.Piece piece : pieces) {
             if (piece.expected == null) continue;
-            addText(
+            addCharacter(
                     answerRow,
-                    String.valueOf(piece.expected),
-                    piece.match ? MATCH_COLOR : MISSING_COLOR,
-                    CHAR_SIZE
+                    piece.expected,
+                    piece.match ? MATCH_COLOR : MISSING_COLOR
             );
         }
 
         layout();
     }
 
-    private void addLabel(List<RenderedTextBlock> row, String text) {
-        addText(row, text + "  ", NEUTRAL_COLOR, LABEL_SIZE);
+    private void addLabel(List<Token> row, String text) {
+        addText(row, text, NEUTRAL_COLOR, LABEL_SIZE);
+        row.add(Token.spacer(WORD_SPACE));
     }
 
-    private void addText(List<RenderedTextBlock> row, String text, int color, int size) {
+    private void addCharacter(List<Token> row, char value, int color) {
+        if (Character.isWhitespace(value)) {
+            row.add(Token.spacer(WORD_SPACE));
+        } else {
+            addText(row, String.valueOf(value), color, CHAR_SIZE);
+        }
+    }
+
+    private void addText(List<Token> row, String text, int color, int size) {
         RenderedTextBlock block = PixelScene.renderTextBlock(text, size);
         block.hardlight(color);
-        row.add(block);
+        row.add(Token.text(block));
         add(block);
     }
 
@@ -121,19 +154,36 @@ public class StudyAnswerComparison extends Component {
         frame.size(width, height);
     }
 
-    private float layoutRow(List<RenderedTextBlock> row, float startY, float contentWidth) {
-        float cursorX = x + PADDING;
+    private float layoutRow(List<Token> row, float startY, float contentWidth) {
+        final float left = x + PADDING;
+        final float right = left + contentWidth;
+
+        float cursorX = left;
         float cursorY = startY;
         float lineHeight = 0;
 
-        for (RenderedTextBlock block : row) {
+        for (Token token : row) {
+            if (token.isSpacer()) {
+                // Never begin a wrapped line with a word-space.
+                if (cursorX > left) {
+                    if (cursorX + token.spacerWidth > right) {
+                        cursorY += Math.max(lineHeight, CHAR_SIZE) + 1;
+                        cursorX = left;
+                        lineHeight = 0;
+                    } else {
+                        cursorX += token.spacerWidth;
+                    }
+                }
+                continue;
+            }
+
+            RenderedTextBlock block = token.block;
             float blockWidth = block.width();
             float blockHeight = block.height();
 
-            if (cursorX > x + PADDING
-                    && cursorX + blockWidth > x + PADDING + contentWidth) {
+            if (cursorX > left && cursorX + blockWidth > right) {
                 cursorY += Math.max(lineHeight, CHAR_SIZE) + 1;
-                cursorX = x + PADDING;
+                cursorX = left;
                 lineHeight = 0;
             }
 
