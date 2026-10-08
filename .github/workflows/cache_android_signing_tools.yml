@@ -19,12 +19,15 @@ jobs:
           ZIPALIGN="$(find unpack -type f -name zipalign | head -n1)"
           APKSIGNER="$(find unpack -type f -name apksigner | head -n1)"
           APKSIGNER_JAR="$(find unpack -type f -name apksigner.jar | head -n1)"
+          LIBCXX="$(find unpack -type f -name 'libc++.so' | head -n1)"
           test -n "$ZIPALIGN"
           test -n "$APKSIGNER"
           test -n "$APKSIGNER_JAR"
+          test -n "$LIBCXX"
           cp "$ZIPALIGN" out/zipalign
           cp "$APKSIGNER" out/apksigner
           cp "$APKSIGNER_JAR" out/apksigner.jar
+          cp "$LIBCXX" out/libc++.so
           chmod +x out/zipalign out/apksigner
       - name: Upload signing tools
         uses: actions/upload-artifact@v4
