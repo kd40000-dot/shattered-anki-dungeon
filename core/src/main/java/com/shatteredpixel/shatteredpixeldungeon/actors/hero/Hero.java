@@ -992,7 +992,6 @@ public class Hero extends Char {
 	}
 	
 	public void interrupt() {
-		continuousStudyTarget = null;
 		if (isAlive() && curAction != null &&
 			((curAction instanceof HeroAction.Move && curAction.dst != pos) ||
 			(curAction instanceof HeroAction.LvlTransition))) {
@@ -1567,6 +1566,14 @@ public class Hero extends Char {
 		return com.shatteredpixel.shatteredpixeldungeon.study.StudyRunState.combatEnabled()
 				&& target != null && isAlive() && target.isAlive()
 				&& canAttack(target) && target.invisible == 0 && !isCharmedBy(target);
+	}
+
+	/** Cancel automated follow-up attacks on an explicit player cancel. */
+	public boolean cancelContinuousStudyAttack() {
+		if (continuousStudyTarget == null) return false;
+		continuousStudyTarget = null;
+		curAction = null;
+		return true;
 	}
 
 	/** Abort the pending attack without spending a turn. */
