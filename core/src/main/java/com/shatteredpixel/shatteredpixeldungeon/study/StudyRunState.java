@@ -39,6 +39,7 @@ public final class StudyRunState {
     }
 
     public static void reset(boolean conjureEnabled, boolean ankiCombatEnabled) {
+        SpellStudy.reset();
         conjureFoodEnabled = conjureEnabled;
         combatEnabled = ankiCombatEnabled;
         conjuredRations = 0;
