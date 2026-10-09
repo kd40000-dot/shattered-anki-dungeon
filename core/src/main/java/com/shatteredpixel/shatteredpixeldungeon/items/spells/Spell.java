@@ -63,7 +63,11 @@ public abstract class Spell extends Item {
 				return;
 			}
 			
-			com.shatteredpixel.shatteredpixeldungeon.study.SpellStudy.cast(() -> onCast(hero), hero);
+			if (this instanceof TargetedSpell || this instanceof InventorySpell) {
+				onCast(hero); // Select target or item before requesting the card.
+			} else {
+				com.shatteredpixel.shatteredpixeldungeon.study.SpellStudy.cast(() -> onCast(hero), hero);
+			}
 			
 		}
 	}

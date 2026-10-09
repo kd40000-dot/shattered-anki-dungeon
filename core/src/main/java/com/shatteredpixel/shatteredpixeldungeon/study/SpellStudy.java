@@ -8,6 +8,7 @@ package com.shatteredpixel.shatteredpixeldungeon.study;
 import com.shatteredpixel.shatteredpixeldungeon.ShatteredPixelDungeon;
 import com.shatteredpixel.shatteredpixeldungeon.actors.hero.Hero;
 import com.shatteredpixel.shatteredpixeldungeon.actors.hero.spells.ClericSpell;
+import com.shatteredpixel.shatteredpixeldungeon.actors.hero.spells.InventoryClericSpell;
 import com.shatteredpixel.shatteredpixeldungeon.items.artifacts.HolyTome;
 import com.shatteredpixel.shatteredpixeldungeon.ui.ItemSlot;
 import com.shatteredpixel.shatteredpixeldungeon.windows.WndTextInput;
@@ -28,7 +29,12 @@ public final class SpellStudy {
 
     public static void cast(ClericSpell spell, HolyTome tome, Hero hero) {
         if (spell == null || tome == null) return;
-        cast(() -> spell.onCast(tome, hero), hero);
+        // Targeted spells first choose a cell; their selection callback gates the effect.
+        if (spell instanceof InventoryClericSpell || spell.usesTargeting() || spell.targetingFlags() != -1) {
+            spell.onCast(tome, hero);
+        } else {
+            cast(() -> spell.onCast(tome, hero), hero);
+        }
     }
 
     public static void cast(Runnable action, Hero hero) {

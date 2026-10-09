@@ -30,6 +30,7 @@ import com.shatteredpixel.shatteredpixeldungeon.items.bags.Bag;
 import com.shatteredpixel.shatteredpixeldungeon.journal.Catalog;
 import com.shatteredpixel.shatteredpixeldungeon.messages.Messages;
 import com.shatteredpixel.shatteredpixeldungeon.scenes.GameScene;
+import com.shatteredpixel.shatteredpixeldungeon.study.SpellStudy;
 import com.shatteredpixel.shatteredpixeldungeon.windows.WndBag;
 import com.watabou.noosa.audio.Sample;
 import com.watabou.utils.Random;
@@ -80,6 +81,8 @@ public abstract class InventorySpell extends Spell {
 			}
 			
 			if (item != null) {
+				final Hero castingHero = curUser;
+				SpellStudy.cast(() -> {
 
 				//Infusion opens a separate window that can be cancelled
 				//so we don't do a lot of logic here
@@ -101,7 +104,7 @@ public abstract class InventorySpell extends Spell {
 						Talent.onScrollUsed(curUser, curUser.pos, ((Spell) curItem).talentFactor, curItem.getClass());
 					}
 				}
-				
+				}, castingHero);
 			}
 		}
 	};

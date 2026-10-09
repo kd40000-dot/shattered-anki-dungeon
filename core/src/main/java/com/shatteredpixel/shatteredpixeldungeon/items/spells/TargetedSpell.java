@@ -32,6 +32,7 @@ import com.shatteredpixel.shatteredpixeldungeon.mechanics.Ballistica;
 import com.shatteredpixel.shatteredpixeldungeon.messages.Messages;
 import com.shatteredpixel.shatteredpixeldungeon.scenes.CellSelector;
 import com.shatteredpixel.shatteredpixeldungeon.scenes.GameScene;
+import com.shatteredpixel.shatteredpixeldungeon.study.SpellStudy;
 import com.shatteredpixel.shatteredpixeldungeon.ui.QuickSlotButton;
 import com.watabou.noosa.audio.Sample;
 import com.watabou.utils.Callback;
@@ -91,7 +92,9 @@ public abstract class TargetedSpell extends Spell {
 				final Ballistica shot = new Ballistica( curUser.pos, target, curSpell.collisionProperties);
 				int cell = shot.collisionPos;
 				
-				curUser.sprite.zap(cell);
+				final Hero castingHero = curUser;
+				SpellStudy.cast(() -> {
+				castingHero.sprite.zap(cell);
 				
 				//attempts to target the cell aimed at if something is there, otherwise targets the collision pos.
 				if (Actor.findChar(target) != null)
@@ -103,9 +106,10 @@ public abstract class TargetedSpell extends Spell {
 				
 				curSpell.fx(shot, new Callback() {
 					public void call() {
-						curSpell.affectTarget(shot, curUser);
+						curSpell.affectTarget(shot, castingHero);
 					}
 				});
+				}, castingHero);
 				
 			}
 				
