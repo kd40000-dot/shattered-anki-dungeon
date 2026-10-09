@@ -867,6 +867,13 @@ public class Hero extends Char {
 			return false;
 		}
 		
+		// Keep the target across SPD's ready() clearing curAction after each turn.
+		// Re-enter the normal attack dispatcher so every swing gets its own card.
+		if (curAction == null && continuousStudyTarget != null) {
+			Char nextTarget = continuousStudyTarget;
+			continuousStudyTarget = null;
+			if (repeatableStudyTarget(nextTarget)) curAction = new HeroAction.Attack(nextTarget);
+		}
 		boolean actResult;
 		if (curAction == null) {
 			
@@ -1545,13 +1552,16 @@ public class Hero extends Char {
 	public void studyAttackFailed() {
 		Char repeatTarget = attackTarget;
 		float delay = attackDelay();
-		curAction = repeatableStudyTarget(repeatTarget) ? new HeroAction.Attack(repeatTarget) : null;
+		continuousStudyTarget = repeatableStudyTarget(repeatTarget) ? repeatTarget : null;
+		curAction = null;
 		attackTarget = null;
 		spend(delay);
 		super.onAttackComplete();
 	}
 
 	/** Queue only another adjacent, visible attack. The ordinary actor turn still runs. */
+	private Char continuousStudyTarget;
+
 	private boolean repeatableStudyTarget(Char target) {
 		return com.shatteredpixel.shatteredpixeldungeon.study.StudyRunState.combatEnabled()
 				&& target != null && isAlive() && target.isAlive()
@@ -1560,6 +1570,7 @@ public class Hero extends Char {
 
 	/** Abort the pending attack without spending a turn. */
 	public void studyAttackCancelled() {
+		continuousStudyTarget = null;
 		curAction = null;
 		attackTarget = null;
 		ready();
@@ -1981,6 +1992,8 @@ public class Hero extends Char {
 	}
 	
 	public boolean handle( int cell ) {
+		// Explicit user input overrides any pending continuous-attack target.
+		continuousStudyTarget = null;
 		
 		if (cell == -1) {
 			return false;
