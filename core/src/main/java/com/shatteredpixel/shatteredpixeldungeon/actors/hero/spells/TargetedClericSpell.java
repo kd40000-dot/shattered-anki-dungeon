@@ -27,6 +27,7 @@ import com.shatteredpixel.shatteredpixeldungeon.mechanics.Ballistica;
 import com.shatteredpixel.shatteredpixeldungeon.messages.Messages;
 import com.shatteredpixel.shatteredpixeldungeon.scenes.CellSelector;
 import com.shatteredpixel.shatteredpixeldungeon.scenes.GameScene;
+import com.shatteredpixel.shatteredpixeldungeon.study.SpellStudy;
 
 public abstract class TargetedClericSpell extends ClericSpell {
 
@@ -35,7 +36,8 @@ public abstract class TargetedClericSpell extends ClericSpell {
 		GameScene.selectCell(new CellSelector.Listener() {
 			@Override
 			public void onSelect(Integer cell) {
-				onTargetSelected(tome, hero, cell);
+				if (cell == null) return; // Cancellation never draws a card.
+				SpellStudy.cast(() -> onTargetSelected(tome, hero, cell), hero);
 			}
 
 			@Override
