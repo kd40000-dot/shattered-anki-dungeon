@@ -28,7 +28,12 @@ public final class SpellStudy {
 
     public static void cast(ClericSpell spell, HolyTome tome, Hero hero) {
         if (spell == null || tome == null) return;
-        cast(() -> spell.onCast(tome, hero), hero);
+        // Targeted spells first choose a cell; their selection callback gates the effect.
+        if (spell.usesTargeting() || spell.targetingFlags() != -1) {
+            spell.onCast(tome, hero);
+        } else {
+            cast(() -> spell.onCast(tome, hero), hero);
+        }
     }
 
     public static void cast(Runnable action, Hero hero) {
