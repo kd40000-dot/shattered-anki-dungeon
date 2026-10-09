@@ -232,7 +232,7 @@ public class WndClericSpells extends Window {
 							if(!tome.canCast(Dungeon.hero, spell)){
 								GLog.w(Messages.get(HolyTome.class, "no_spell"));
 							} else {
-								spell.onCast(tome, Dungeon.hero);
+								SpellStudy.cast(spell, tome, Dungeon.hero);
 
 								if (spell.targetingFlags() != -1 && Dungeon.quickslot.contains(tome)){
 									tome.targetingSpell = spell;
