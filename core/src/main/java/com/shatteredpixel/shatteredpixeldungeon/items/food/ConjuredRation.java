@@ -13,6 +13,7 @@ package com.shatteredpixel.shatteredpixeldungeon.items.food;
 import com.shatteredpixel.shatteredpixeldungeon.actors.hero.Hero;
 import com.shatteredpixel.shatteredpixeldungeon.effects.SpellSprite;
 import com.shatteredpixel.shatteredpixeldungeon.messages.Messages;
+import com.shatteredpixel.shatteredpixeldungeon.sprites.ItemSprite;
 import com.shatteredpixel.shatteredpixeldungeon.scenes.GameScene;
 import com.shatteredpixel.shatteredpixeldungeon.utils.GLog;
 
@@ -24,6 +25,13 @@ public class ConjuredRation extends Food {
 
     {
         bones = false;
+    }
+
+    private static final ItemSprite.Glowing CYAN_GLOW = new ItemSprite.Glowing(0x00FFFF);
+
+    @Override
+    public ItemSprite.Glowing glowing() {
+        return CYAN_GLOW;
     }
 
     @Override

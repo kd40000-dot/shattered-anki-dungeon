@@ -22,7 +22,7 @@ import com.watabou.utils.Bundle;
 public final class StudyRunState {
 
     private static final int[] CONJURE_FOOD_COSTS = {
-            1, 2, 3, 4, 5, 5, 6, 6, 7, 7, 8, 8, 9, 9, 10
+            1, 2, 3, 4, 5
     };
 
     private static final String CONJURE_FOOD_ENABLED = "conjure_food_enabled";
@@ -39,6 +39,7 @@ public final class StudyRunState {
     }
 
     public static void reset(boolean conjureEnabled, boolean ankiCombatEnabled) {
+        SpellStudy.reset();
         conjureFoodEnabled = conjureEnabled;
         combatEnabled = ankiCombatEnabled;
         conjuredRations = 0;
@@ -75,7 +76,7 @@ public final class StudyRunState {
 
     /**
      * Cost of the next ration after {@code alreadyConjured} successful
-     * conjurations. The curve rises gently and is permanently capped at 10.
+     * conjurations. The curve rises gently and is permanently capped at 5.
      */
     public static int reviewsRequiredForRation(int alreadyConjured) {
         int index = Math.max(0, Math.min(alreadyConjured, CONJURE_FOOD_COSTS.length - 1));

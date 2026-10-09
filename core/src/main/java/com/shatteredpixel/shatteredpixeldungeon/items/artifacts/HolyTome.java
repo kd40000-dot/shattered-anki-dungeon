@@ -361,7 +361,7 @@ public class HolyTome extends Artifact {
 					GameScene.handleCell( QuickSlotButton.lastTarget.pos );
 				}
 			} else {
-				quickSpell.onCast(HolyTome.this, Dungeon.hero);
+				com.shatteredpixel.shatteredpixeldungeon.study.SpellStudy.cast(quickSpell, HolyTome.this, Dungeon.hero);
 
 				if (quickSpell.targetingFlags() != -1 && Dungeon.quickslot.contains(HolyTome.this)){
 					targetingSpell = quickSpell;

@@ -27,6 +27,7 @@ import com.shatteredpixel.shatteredpixeldungeon.SPDSettings;
 import com.shatteredpixel.shatteredpixeldungeon.actors.hero.Hero;
 import com.shatteredpixel.shatteredpixeldungeon.actors.hero.Talent;
 import com.shatteredpixel.shatteredpixeldungeon.actors.hero.spells.ClericSpell;
+import com.shatteredpixel.shatteredpixeldungeon.study.SpellStudy;
 import com.shatteredpixel.shatteredpixeldungeon.actors.hero.spells.GuidingLight;
 import com.shatteredpixel.shatteredpixeldungeon.items.artifacts.HolyTome;
 import com.shatteredpixel.shatteredpixeldungeon.messages.Messages;
@@ -194,7 +195,7 @@ public class WndClericSpells extends Window {
 				if(!tome.canCast(Dungeon.hero, spell)){
 					GLog.w(Messages.get(HolyTome.class, "no_spell"));
 				} else {
-					spell.onCast(tome, Dungeon.hero);
+					SpellStudy.cast(spell, tome, Dungeon.hero);
 
 					if (spell.targetingFlags() != -1 && Dungeon.quickslot.contains(tome)){
 						tome.targetingSpell = spell;
