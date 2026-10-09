@@ -37,10 +37,10 @@ public class StudyIntegrationStateTest {
     }
 
     @Test
-    public void conjureFoodCostProgressesAndCapsAtTen() {
+    public void conjureFoodCostProgressesAndCapsAtFive() {
         StudyRunState.reset(true, true);
 
-        int[] expected = {1,2,3,4,5,5,6,6,7,7,8,8,9,9,10,10,10};
+        int[] expected = {1,2,3,4,5,5,5,5,5,5,5};
         for (int cost : expected) {
             assertEquals(cost, StudyRunState.reviewsRequired());
             for (int i = 1; i < cost; i++) {
@@ -49,7 +49,7 @@ public class StudyIntegrationStateTest {
             assertTrue(StudyRunState.recordResolvedReview());
         }
 
-        assertEquals(10, StudyRunState.reviewsRequired());
+        assertEquals(5, StudyRunState.reviewsRequired());
     }
 
     @Test
