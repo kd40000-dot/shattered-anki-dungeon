@@ -56,7 +56,7 @@ public final class SpellStudy {
                 @Override public void onCardLoaded(StudyCard card) {
                     if (!current(session)) return;
                     if (card == null) { finish(session); return; }
-                    showQuestion(session, card, spell, tome, hero);
+                    showQuestion(session, card, action, hero);
                 }
                 @Override public void onNoCardsDue() {
                     if (!current(session)) return;
@@ -132,7 +132,7 @@ public final class SpellStudy {
                         pendingCard = null;
                         forceAgain = false;
                         finish(session);
-                        if (correct && hero.isAlive()) spell.onCast(tome, hero);
+                        if (correct && hero.isAlive()) action.run();
                     }
                     @Override public void onError(String detail) {
                         if (!current(session)) return;
