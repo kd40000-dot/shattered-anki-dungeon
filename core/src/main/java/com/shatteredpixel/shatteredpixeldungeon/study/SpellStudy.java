@@ -83,9 +83,11 @@ public final class SpellStudy {
                 ShatteredPixelDungeon.scene().addToFront(new WndTextInput(
                         "Anki Spell", card.question, "", 512, false,
                         "Check", "Cancel Spell", true, true, null) {
+                    private boolean revealing;
                     @Override public void onSelect(boolean positive, String text) {
                         if (!current(session)) return;
                         if (!positive) { finish(session); return; }
+                        revealing = true;
                         reveal(session, card, text == null ? "" : text, action, hero);
                     }
                     @Override public void onBackPressed() {
@@ -93,7 +95,7 @@ public final class SpellStudy {
                         hide();
                     }
                     @Override protected void onDismissed() {
-                        // The question is dismissed before the rating window opens.
+                        if (!revealing) finish(session);
                     }
                 });
             }
