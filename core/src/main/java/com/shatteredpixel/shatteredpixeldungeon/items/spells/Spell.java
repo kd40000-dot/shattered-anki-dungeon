@@ -63,7 +63,9 @@ public abstract class Spell extends Item {
 				return;
 			}
 			
-			com.shatteredpixel.shatteredpixeldungeon.study.SpellStudy.cast(() -> onCast(hero), hero);
+			// Concrete inventory spells prepare any target using their own onCast.
+			// The final effect should call SpellStudy.cast once setup is complete.
+			onCast(hero);
 			
 		}
 	}
