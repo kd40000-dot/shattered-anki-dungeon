@@ -17,7 +17,8 @@ public final class StudySessionGuard {
 
     public enum Owner {
         COMBAT,
-        CONJURE_FOOD
+        CONJURE_FOOD,
+        SPELL
     }
 
     private static long generation;
