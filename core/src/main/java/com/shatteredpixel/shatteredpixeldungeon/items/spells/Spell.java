@@ -63,7 +63,7 @@ public abstract class Spell extends Item {
 				return;
 			}
 			
-			onCast( hero );
+			com.shatteredpixel.shatteredpixeldungeon.study.SpellStudy.cast(() -> onCast(hero), hero);
 			
 		}
 	}
