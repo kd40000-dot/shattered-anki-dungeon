@@ -27,6 +27,7 @@ import com.shatteredpixel.shatteredpixeldungeon.items.artifacts.HolyTome;
 import com.shatteredpixel.shatteredpixeldungeon.items.bags.Bag;
 import com.shatteredpixel.shatteredpixeldungeon.messages.Messages;
 import com.shatteredpixel.shatteredpixeldungeon.scenes.GameScene;
+import com.shatteredpixel.shatteredpixeldungeon.study.SpellStudy;
 import com.shatteredpixel.shatteredpixeldungeon.windows.WndBag;
 
 public abstract class InventoryClericSpell extends ClericSpell {
@@ -52,7 +53,7 @@ public abstract class InventoryClericSpell extends ClericSpell {
 
 			@Override
 			public void onSelect(Item item) {
-				onItemSelected(tome, hero, item);
+				if (item != null) SpellStudy.cast(() -> onItemSelected(tome, hero, item), hero);
 			}
 		});
 	}
