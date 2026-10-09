@@ -992,6 +992,7 @@ public class Hero extends Char {
 	}
 	
 	public void interrupt() {
+		continuousStudyTarget = null;
 		if (isAlive() && curAction != null &&
 			((curAction instanceof HeroAction.Move && curAction.dst != pos) ||
 			(curAction instanceof HeroAction.LvlTransition))) {
