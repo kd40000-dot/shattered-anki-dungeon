@@ -27,9 +27,14 @@ public final class SpellStudy {
     private SpellStudy() {}
 
     public static void cast(ClericSpell spell, HolyTome tome, Hero hero) {
-        if (spell == null || tome == null || hero == null) return;
+        if (spell == null || tome == null) return;
+        cast(() -> spell.onCast(tome, hero), hero);
+    }
+
+    public static void cast(Runnable action, Hero hero) {
+        if (action == null || hero == null) return;
         if (!StudyRunState.combatEnabled()) {
-            spell.onCast(tome, hero);
+            action.run();
             return;
         }
         if (Study.service == null || !Study.service.backendAvailable() || !Study.service.hasAccess()) {
@@ -45,7 +50,7 @@ public final class SpellStudy {
         token = session;
         if (pendingCard != null) {
             StudyCard card = pendingCard;
-            showQuestion(session, card, spell, tome, hero);
+            showQuestion(session, card, action, hero);
         } else {
             Study.service.loadNextCard(new StudyService.CardCallback() {
                 @Override public void onCardLoaded(StudyCard card) {
@@ -56,7 +61,7 @@ public final class SpellStudy {
                 @Override public void onNoCardsDue() {
                     if (!current(session)) return;
                     finish(session);
-                    if (hero.isAlive()) spell.onCast(tome, hero);
+                    if (hero.isAlive()) action.run();
                 }
                 @Override public void onError(String detail) {
                     if (!current(session)) return;
@@ -71,8 +76,7 @@ public final class SpellStudy {
         return token == session && StudySessionGuard.isCurrent(OWNER, session);
     }
 
-    private static void showQuestion(long session, StudyCard card, ClericSpell spell,
-                                     HolyTome tome, Hero hero) {
+    private static void showQuestion(long session, StudyCard card, Runnable action, Hero hero) {
         Game.runOnRenderThread(new Callback() {
             @Override public void call() {
                 if (!current(session)) return;
@@ -82,7 +86,7 @@ public final class SpellStudy {
                     @Override public void onSelect(boolean positive, String text) {
                         if (!current(session)) return;
                         if (!positive) { finish(session); return; }
-                        reveal(session, card, text == null ? "" : text, spell, tome, hero);
+                        reveal(session, card, text == null ? "" : text, action, hero);
                     }
                     @Override public void onBackPressed() {
                         finish(session);
@@ -96,8 +100,7 @@ public final class SpellStudy {
         });
     }
 
-    private static void reveal(long session, StudyCard card, String typed, ClericSpell spell,
-                               HolyTome tome, Hero hero) {
+    private static void reveal(long session, StudyCard card, String typed, Runnable action, Hero hero) {
         if (!current(session)) return;
         boolean correct = TypedAnswerMatcher.matchedAlternative(typed, card.answer) != null;
         boolean firstBlank = typed.trim().isEmpty() && card.reps == 0 && !forceAgain;
