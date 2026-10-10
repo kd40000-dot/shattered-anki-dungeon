@@ -53,6 +53,23 @@ public class StudyIntegrationStateTest {
     }
 
     @Test
+    public void incorrectConjureFoodAnswersNeverGrantOrAdvanceProgress() {
+        StudyRunState.reset(true, true);
+        for (int i = 0; i < 12; i++) {
+            assertFalse(StudyRunState.recordResolvedReview(false));
+        }
+        assertEquals(0, StudyRunState.conjuredRations());
+        assertEquals(0, StudyRunState.reviewsTowardNext());
+        assertTrue(StudyRunState.recordResolvedReview(true));
+        assertEquals(1, StudyRunState.conjuredRations());
+        for (int i = 0; i < 12; i++) {
+            assertFalse(StudyRunState.recordResolvedReview(false));
+        }
+        assertEquals(1, StudyRunState.conjuredRations());
+        assertEquals(0, StudyRunState.reviewsTowardNext());
+    }
+
+    @Test
     public void disabledConjureFoodDoesNotAdvance() {
         StudyRunState.reset(false, true);
         assertFalse(StudyRunState.recordResolvedReview());

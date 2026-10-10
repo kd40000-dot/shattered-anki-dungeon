@@ -90,7 +90,12 @@ public final class StudyRunState {
      * The caller can use that edge to grant one conjured ration.
      */
     public static boolean recordResolvedReview() {
-        if (!conjureFoodEnabled) {
+        return recordResolvedReview(true);
+    }
+
+    /** Only typed-correct reviews may contribute to conjured food. */
+    public static boolean recordResolvedReview(boolean typedCorrect) {
+        if (!conjureFoodEnabled || !typedCorrect) {
             return false;
         }
 
