@@ -241,7 +241,7 @@ public final class ConjureFoodStudy {
 
                 // This callback is reachable only after a typed-correct response.
                 // Wrong attempts never enter answer() or advance ration progress.
-                boolean completedRation = StudyRunState.recordResolvedReview();
+                boolean completedRation = StudyRunState.recordResolvedReview(true);
                 retryPenaltyActive = false;
                 persistProgressSafely();
 
