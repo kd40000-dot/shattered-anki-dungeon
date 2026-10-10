@@ -32,6 +32,7 @@ public final class ConjureFoodStudy {
     private static boolean loading;
     private static boolean submitting;
     private static long cardShownAt;
+    private static boolean retryPenaltyActive;
 
     private ConjureFoodStudy() {
     }
@@ -82,6 +83,7 @@ public final class ConjureFoodStudy {
         sessionActive = true;
         loading = false;
         submitting = false;
+        retryPenaltyActive = false;
         loadNextCard(token);
     }
 
@@ -180,7 +182,9 @@ public final class ConjureFoodStudy {
 
         for (int i = 0; i < count; i++) {
             String label = Messages.get(ConjureFoodStudy.class, EASE_KEYS[i]);
-            String interval = i < card.nextReviewTimes.length ? card.nextReviewTimes[i] : "";
+            int intervalIndex = retryPenaltyActive ? 0 : i;
+            String interval = intervalIndex < card.nextReviewTimes.length
+                    ? card.nextReviewTimes[intervalIndex] : "";
             options[i] = interval == null || interval.trim().isEmpty()
                     ? label
                     : label + "\n" + interval;
@@ -204,7 +208,15 @@ public final class ConjureFoodStudy {
             @Override
             protected void onSelect(int index) {
                 if (!isCurrent(token)) return;
-                submitRating(token, card, index + 1);
+                if (!correct) {
+                    // Do not submit or award progress for a wrong answer. Reask the
+                    // same card, retaining an Again penalty through all retries.
+                    retryPenaltyActive = true;
+                    cardShownAt = Game.realTime;
+                    showQuestion(token, card);
+                } else {
+                    submitRating(token, card, retryPenaltyActive ? 1 : index + 1);
+                }
             }
 
             @Override
@@ -227,7 +239,10 @@ public final class ConjureFoodStudy {
                 submitting = false;
                 StudyPreviousRating.record(ease);
 
+                // This callback is reachable only after a typed-correct response.
+                // Wrong attempts never enter answer() or advance ration progress.
                 boolean completedRation = StudyRunState.recordResolvedReview();
+                retryPenaltyActive = false;
                 persistProgressSafely();
 
                 if (completedRation) {
@@ -314,6 +329,7 @@ public final class ConjureFoodStudy {
         loading = false;
         submitting = false;
         cardShownAt = 0L;
+        retryPenaltyActive = false;
     }
 
     private static void showMessage(String message) {
